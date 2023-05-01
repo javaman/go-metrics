@@ -16,11 +16,6 @@ func (h *MemStorage) ServeHTTP(res http.ResponseWriter, r *http.Request) {
 		res.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
-
-	if r.Header.Get("Content-Type") != "text/plain" {
-		res.WriteHeader(http.StatusUnsupportedMediaType)
-		return
-	}
 	parts := strings.Split(r.URL.Path, "/")
 	if len(parts) <= 2 || (parts[2] != "gauge" && parts[2] != "counter") {
 		res.WriteHeader(http.StatusBadRequest)
