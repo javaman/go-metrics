@@ -25,7 +25,11 @@ func (h *MemStorage) ServeHTTP(res http.ResponseWriter, r *http.Request) {
 		if _, err := strconv.ParseFloat(parts[3], 64); err == nil {
 			res.WriteHeader(http.StatusNotFound)
 		} else {
-			res.WriteHeader(http.StatusBadRequest)
+			if strings.TrimSpace(parts[3]) == "" {
+				res.WriteHeader(http.StatusNotFound)
+			} else {
+				res.WriteHeader(http.StatusBadRequest)
+			}
 		}
 		return
 	}
@@ -33,10 +37,35 @@ func (h *MemStorage) ServeHTTP(res http.ResponseWriter, r *http.Request) {
 		if _, err := strconv.ParseInt(parts[3], 10, 64); err == nil {
 			res.WriteHeader(http.StatusNotFound)
 		} else {
-			res.WriteHeader(http.StatusBadRequest)
+			if strings.TrimSpace(parts[3]) == "" {
+				res.WriteHeader(http.StatusNotFound)
+			} else {
+				res.WriteHeader(http.StatusBadRequest)
+			}
 		}
 		return
 	}
+
+	if parts[2] == "gauge" {
+		if _, err := strconv.ParseFloat(parts[3], 64); err != nil {
+			if strings.TrimSpace(parts[3]) == "" {
+				res.WriteHeader(http.StatusNotFound)
+			} else {
+				res.WriteHeader(http.StatusBadRequest)
+			}
+		}
+	}
+
+	if parts[2] == "counter" {
+		if _, err := strconv.ParseInt(parts[3], 10, 64); err != nil {
+			if strings.TrimSpace(parts[3]) == "" {
+				res.WriteHeader(http.StatusNotFound)
+			} else {
+				res.WriteHeader(http.StatusBadRequest)
+			}
+		}
+	}
+
 	res.Header().Set("Content-Type", "text/plain")
 }
 
