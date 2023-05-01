@@ -17,7 +17,7 @@ func (h *MemStorage) ServeHTTP(res http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if "text/plain" != r.Header.Get("Content-Type") {
+	if r.Header.Get("Content-Type") != "text/plain" {
 		res.WriteHeader(http.StatusUnsupportedMediaType)
 		return
 	}
