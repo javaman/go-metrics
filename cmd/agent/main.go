@@ -147,7 +147,7 @@ func main() {
 	intervalsGcd := gcd(pollInterval, reportInterval)
 	timeSpent := 0
 
-	for true {
+	for {
 		time.Sleep(time.Duration(intervalsGcd) * time.Second)
 		timeSpent += intervalsGcd
 

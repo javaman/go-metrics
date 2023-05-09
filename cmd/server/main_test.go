@@ -44,6 +44,7 @@ func TestStatuses(t *testing.T) {
 			memStorage.ServeHTTP(w, request)
 
 			result := w.Result()
+			defer result.Body.Close()
 
 			assert.Equal(t, test.expectedStatus, result.StatusCode)
 		})
