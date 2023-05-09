@@ -4,7 +4,9 @@ import (
 	"flag"
 	"fmt"
 	"math/rand"
+	"os"
 	"runtime"
+	"strconv"
 	"time"
 
 	"github.com/go-resty/resty/v2"
@@ -117,7 +119,7 @@ func (s *measuresServer) saveGauge(m Measure, v float64) {
 	s.R().Post("/gauge/" + m.name() + "/" + fmt.Sprintf("%f", v))
 }
 
-func gcd(a, b int) int {
+func gcd(a, b int64) int64 {
 	for b != 0 {
 		a, b = b, a%b
 	}
@@ -134,9 +136,29 @@ func send(measures []Measure, destination MeasureDestination) {
 func main() {
 
 	address := flag.String("a", "localhost:8080", "Адрес сервера")
-	pollInterval := flag.Int("p", 2, "Частота опроса метрик")
-	reportInterval := flag.Int("r", 10, "Частота отправки на сервер")
+	pollInterval := flag.Int64("p", 2, "Частота опроса метрик")
+	reportInterval := flag.Int64("r", 10, "Частота отправки на сервер")
 	flag.Parse()
+
+	if value, ok := os.LookupEnv("ADDRESS"); ok {
+		address = &value
+	}
+
+	if value, ok := os.LookupEnv("REPORT_INTERVAL"); ok {
+		if parsed, err := strconv.ParseInt(value, 10, 64); err != nil {
+			panic(err)
+		} else {
+			reportInterval = &parsed
+		}
+	}
+
+	if value, ok := os.LookupEnv("POLL_INTERVAL"); ok {
+		if parsed, err := strconv.ParseInt(value, 10, 64); err != nil {
+			panic(err)
+		} else {
+			pollInterval = &parsed
+		}
+	}
 
 	defaultMeasured := &defaultMeasured{}
 	measuresBuffer := &measuresBuffer{}
@@ -148,7 +170,7 @@ func main() {
 	measuresServer.SetDebug(true)
 
 	intervalsGcd := gcd(*pollInterval, *reportInterval)
-	timeSpent := 0
+	var timeSpent int64
 
 	for {
 		time.Sleep(time.Duration(intervalsGcd) * time.Second)

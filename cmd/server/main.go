@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 
@@ -139,6 +140,10 @@ func main() {
 
 	address := flag.String("a", "localhost:8080", "Адрес сервера")
 	flag.Parse()
+
+	if value, ok := os.LookupEnv("ADDRESS"); ok {
+		address = &value
+	}
 
 	storage := &memStorage{make(map[string]int64), make(map[string]float64)}
 	e := echo.New()
