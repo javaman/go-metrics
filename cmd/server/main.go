@@ -1,93 +1,144 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"strconv"
 	"strings"
+
+	"github.com/labstack/echo/v4"
 )
 
-type MemStorage struct {
-	gauge   float64
-	counter int64
+type Storage interface {
+	SaveGauge(name string, v float64)
+	GetGauge(name string) (float64, bool)
+	AllGauges(func(string, float64))
+	SaveCounter(name string, v int64)
+	GetCounter(name string) (int64, bool)
+	AllCounters(func(string, int64))
 }
 
-func validate(r *http.Request) (string, bool, float64, int64, int) {
-	if r.Method != http.MethodPost {
-		return "", false, 0, 0, http.StatusMethodNotAllowed
-	} else {
-		parts := strings.Split(r.URL.Path, "/")
-		metricType := ""
-		metricName := ""
-		metricValue := ""
-		if len(parts) >= 3 {
-			metricType = strings.TrimSpace(parts[2])
-		}
-		if len(parts) >= 4 {
-			metricName = strings.TrimSpace(parts[3])
-		}
-		if len(parts) >= 5 {
-			metricValue = strings.TrimSpace(parts[4])
-		}
-		return validateParams(metricType, metricName, metricValue)
+type memStorage struct {
+	counters map[string]int64
+	gauges   map[string]float64
+}
+
+func (m *memStorage) GetGauge(name string) (float64, bool) {
+	v, found := m.gauges[name]
+	return v, found
+}
+
+func (m *memStorage) SaveGauge(name string, v float64) {
+	log.Print(fmt.Sprintf("Received gauge %s = %f", name, v))
+	m.gauges[name] = v
+}
+
+func (m *memStorage) AllGauges(f func(string, float64)) {
+	for k, v := range m.gauges {
+		f(k, v)
 	}
 }
 
-func validateParams(metricType string, metricName string, metricValue string) (name string, isGauge bool, gaugeValue float64, counter int64, status int) {
-	name = metricName
-	isGauge = false
-	gaugeValue = 0
-	counter = 0
-	status = http.StatusOK
+func (m *memStorage) GetCounter(name string) (int64, bool) {
+	v, found := m.counters[name]
+	return v, found
+}
 
-	switch metricType {
-	case "gauge":
-		isGauge = true
-	case "counter":
-		isGauge = false
-	default:
-		status = http.StatusBadRequest
-		return
+func (m *memStorage) SaveCounter(name string, v int64) {
+	log.Print(fmt.Sprintf("Received counter %s = %d", name, v))
+	m.counters[name] = v
+}
+
+func (m *memStorage) AllCounters(f func(string, int64)) {
+	for k, v := range m.counters {
+		f(k, v)
 	}
+}
 
-	if metricName == "" {
-		status = http.StatusNotFound
-		return
-	}
+func badRequest(c echo.Context) error {
+	return c.NoContent(http.StatusBadRequest)
+}
 
-	if isGauge {
-		if value, err := strconv.ParseFloat(metricValue, 64); err == nil {
-			gaugeValue = value
+func valueGauge(s Storage) func(echo.Context) error {
+	return func(c echo.Context) error {
+		measureName := c.Param("measureName")
+		if value, found := s.GetGauge(measureName); found {
+			return c.String(http.StatusOK, fmt.Sprintf("%f", value))
 		} else {
-			status = http.StatusBadRequest
-			return
-		}
-	} else {
-		if value, err := strconv.ParseInt(metricValue, 10, 64); err == nil {
-			counter = value
-		} else {
-			status = http.StatusBadRequest
-			return
+			return c.NoContent(http.StatusNotFound)
 		}
 	}
-
-	return
 }
 
-func (h *MemStorage) ServeHTTP(res http.ResponseWriter, r *http.Request) {
-	_, _, _, _, status := validate(r)
-	log.Print("Got Request!")
-	res.Header().Set("Content-Type", "text/plain")
-	res.WriteHeader(status)
+func updateGauge(s Storage) func(echo.Context) error {
+	return func(c echo.Context) error {
+		measureName := c.Param("measureName")
+		if strings.TrimSpace(measureName) == "" {
+			return c.NoContent(http.StatusNotFound)
+		}
+		if measureValue, err := strconv.ParseFloat(c.Param("measureValue"), 64); err == nil {
+			s.SaveGauge(measureName, measureValue)
+			return c.NoContent(http.StatusOK)
+		} else {
+			return badRequest(c)
+		}
+	}
+}
+
+func valueCounter(s Storage) func(echo.Context) error {
+	return func(c echo.Context) error {
+		measureName := c.Param("measureName")
+		if value, found := s.GetCounter(measureName); found {
+			return c.String(http.StatusOK, fmt.Sprintf("%d", value))
+		} else {
+			return c.NoContent(http.StatusNotFound)
+		}
+	}
+}
+func updateCounter(s Storage) func(echo.Context) error {
+	return func(c echo.Context) error {
+		metricName := c.Param("measureName")
+		if strings.TrimSpace(metricName) == "" {
+			return c.NoContent(http.StatusNotFound)
+		}
+		if metricValue, err := strconv.ParseInt(c.Param("measureValue"), 10, 64); err == nil {
+			s.SaveCounter(metricName, metricValue)
+			return c.NoContent(http.StatusOK)
+		} else {
+			return badRequest(c)
+		}
+	}
+}
+
+func listAll(s Storage) func(echo.Context) error {
+	return func(e echo.Context) error {
+		var b strings.Builder
+		b.WriteString("<html><head><title>AllMetrics</title></head><body><table>")
+		s.AllGauges(func(n string, v float64) {
+			b.WriteString(fmt.Sprintf("<tr><td>%s</td><td>%f</td></tr>", n, v))
+		})
+		s.AllCounters(func(n string, v int64) {
+			b.WriteString(fmt.Sprintf("<tr><td>%s</td><td>%d</td></tr>", n, v))
+		})
+		b.WriteString("</table></body></html>")
+		return e.HTML(http.StatusOK, b.String())
+	}
 }
 
 func main() {
-	mux := http.NewServeMux()
-	mux.Handle("/update/", new(MemStorage))
+	storage := &memStorage{make(map[string]int64), make(map[string]float64)}
+	e := echo.New()
 
-	err := http.ListenAndServe("127.0.0.1:8080", mux)
+	e.GET("/", listAll(storage))
 
-	if err != nil {
-		panic(err)
-	}
+	e.GET("/value/counter/:measureName", valueCounter(storage))
+	e.GET("/value/gauge/:measureName", valueGauge(storage))
+
+	e.GET("/update/*", func(c echo.Context) error { return c.NoContent(http.StatusMethodNotAllowed) })
+	e.POST("/update/:measureType/*", badRequest)
+	e.POST("/update/counter/:measureName/:measureValue", updateCounter(storage))
+	e.POST("/update/gauge/:measureName/:measureValue", updateGauge(storage))
+
+	e.Logger.Fatal(e.Start(":8080"))
 }
