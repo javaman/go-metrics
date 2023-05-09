@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"log"
 	"net/http"
@@ -135,6 +136,10 @@ func listAll(s Storage) func(echo.Context) error {
 }
 
 func main() {
+
+	address := flag.String("a", "localhost:8080", "Адрес сервера")
+	flag.Parse()
+
 	storage := &memStorage{make(map[string]int64), make(map[string]float64)}
 	e := echo.New()
 
@@ -151,5 +156,5 @@ func main() {
 	e.POST("/update/gauge/:measureName/:measureValue", updateGauge(storage))
 	e.POST("/update/gauge/", notFound)
 
-	e.Logger.Fatal(e.Start(":8080"))
+	e.Logger.Fatal(e.Start(*address))
 }

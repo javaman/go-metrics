@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"math/rand"
 	"runtime"
@@ -132,30 +133,35 @@ func send(measures []Measure, destination MeasureDestination) {
 
 func main() {
 
+	//a - server
+	//r - repeat interlav
+	//p - poll interval
+
+	address := flag.String("a", "localhost:8080", "Адрес сервера")
+	pollInterval := flag.Int("p", 2, "Частота опроса метрик")
+	reportInterval := flag.Int("r", 10, "Частота отправки на сервер")
+
 	defaultMeasured := &defaultMeasured{}
 	measuresBuffer := &measuresBuffer{}
 	measuresServer := &measuresServer{
 		resty.New(),
 	}
 
-	measuresServer.SetBaseURL("http://localhost:8080/update")
+	measuresServer.SetBaseURL("http://" + *address + "/update")
 	measuresServer.SetDebug(true)
 
-	const pollInterval = 2
-	const reportInterval = 10
-
-	intervalsGcd := gcd(pollInterval, reportInterval)
+	intervalsGcd := gcd(*pollInterval, *reportInterval)
 	timeSpent := 0
 
 	for {
 		time.Sleep(time.Duration(intervalsGcd) * time.Second)
 		timeSpent += intervalsGcd
 
-		if timeSpent%pollInterval == 0 {
+		if timeSpent%*pollInterval == 0 {
 			defaultMeasured.captureMetrics(measuresBuffer)
 		}
 
-		if timeSpent%reportInterval == 0 {
+		if timeSpent%*reportInterval == 0 {
 
 			metricsToSend := make([]Measure, len(measuresBuffer.buffer))
 			copy(metricsToSend, measuresBuffer.buffer)
@@ -164,7 +170,7 @@ func main() {
 			measuresBuffer.buffer = measuresBuffer.buffer[:0]
 		}
 
-		if timeSpent%reportInterval == 0 && timeSpent%pollInterval == 0 {
+		if timeSpent%*reportInterval == 0 && timeSpent%*pollInterval == 0 {
 			timeSpent = 0
 		}
 
