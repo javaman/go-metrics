@@ -68,7 +68,7 @@ func valueGauge(s Storage) func(echo.Context) error {
 	return func(c echo.Context) error {
 		measureName := c.Param("measureName")
 		if value, found := s.GetGauge(measureName); found {
-			return c.String(http.StatusOK, fmt.Sprintf("%f", value))
+			return c.String(http.StatusOK, strconv.FormatFloat(value, 'f', -1, 64))
 		} else {
 			return notFound(c)
 		}
