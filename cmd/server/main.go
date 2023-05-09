@@ -1,6 +1,7 @@
 package main
 
 import (
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -75,6 +76,7 @@ func validateParams(metricType string, metricName string, metricValue string) (n
 
 func (h *MemStorage) ServeHTTP(res http.ResponseWriter, r *http.Request) {
 	_, _, _, _, status := validate(r)
+	log.Print("Got Request!")
 	res.Header().Set("Content-Type", "text/plain")
 	res.WriteHeader(status)
 }
