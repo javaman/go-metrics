@@ -30,7 +30,7 @@ func (m *memStorage) GetGauge(name string) (float64, bool) {
 }
 
 func (m *memStorage) SaveGauge(name string, v float64) {
-	log.Print(fmt.Sprintf("Received gauge %s = %f", name, v))
+	log.Printf("Received gauge %s = %f", name, v)
 	m.gauges[name] = v
 }
 
@@ -46,7 +46,7 @@ func (m *memStorage) GetCounter(name string) (int64, bool) {
 }
 
 func (m *memStorage) SaveCounter(name string, v int64) {
-	log.Print(fmt.Sprintf("Received counter %s = %d", name, v))
+	log.Printf("Received counter %s = %d", name, v)
 	m.counters[name] = v
 }
 
@@ -60,13 +60,17 @@ func badRequest(c echo.Context) error {
 	return c.NoContent(http.StatusBadRequest)
 }
 
+func notFound(c echo.Context) error {
+	return c.NoContent(http.StatusNotFound)
+}
+
 func valueGauge(s Storage) func(echo.Context) error {
 	return func(c echo.Context) error {
 		measureName := c.Param("measureName")
 		if value, found := s.GetGauge(measureName); found {
 			return c.String(http.StatusOK, fmt.Sprintf("%f", value))
 		} else {
-			return c.NoContent(http.StatusNotFound)
+			return notFound(c)
 		}
 	}
 }
@@ -75,7 +79,7 @@ func updateGauge(s Storage) func(echo.Context) error {
 	return func(c echo.Context) error {
 		measureName := c.Param("measureName")
 		if strings.TrimSpace(measureName) == "" {
-			return c.NoContent(http.StatusNotFound)
+			return notFound(c)
 		}
 		if measureValue, err := strconv.ParseFloat(c.Param("measureValue"), 64); err == nil {
 			s.SaveGauge(measureName, measureValue)
@@ -92,7 +96,7 @@ func valueCounter(s Storage) func(echo.Context) error {
 		if value, found := s.GetCounter(measureName); found {
 			return c.String(http.StatusOK, fmt.Sprintf("%d", value))
 		} else {
-			return c.NoContent(http.StatusNotFound)
+			return notFound(c)
 		}
 	}
 }
@@ -100,7 +104,7 @@ func updateCounter(s Storage) func(echo.Context) error {
 	return func(c echo.Context) error {
 		metricName := c.Param("measureName")
 		if strings.TrimSpace(metricName) == "" {
-			return c.NoContent(http.StatusNotFound)
+			return notFound(c)
 		}
 		if metricValue, err := strconv.ParseInt(c.Param("measureValue"), 10, 64); err == nil {
 			s.SaveCounter(metricName, metricValue)
@@ -137,8 +141,11 @@ func main() {
 
 	e.GET("/update/*", func(c echo.Context) error { return c.NoContent(http.StatusMethodNotAllowed) })
 	e.POST("/update/:measureType/*", badRequest)
+
 	e.POST("/update/counter/:measureName/:measureValue", updateCounter(storage))
+	e.POST("/update/counter/", notFound)
 	e.POST("/update/gauge/:measureName/:measureValue", updateGauge(storage))
+	e.POST("/update/gauge/", notFound)
 
 	e.Logger.Fatal(e.Start(":8080"))
 }
