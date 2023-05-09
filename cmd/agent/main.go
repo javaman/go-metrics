@@ -133,13 +133,10 @@ func send(measures []Measure, destination MeasureDestination) {
 
 func main() {
 
-	//a - server
-	//r - repeat interlav
-	//p - poll interval
-
 	address := flag.String("a", "localhost:8080", "Адрес сервера")
 	pollInterval := flag.Int("p", 2, "Частота опроса метрик")
 	reportInterval := flag.Int("r", 10, "Частота отправки на сервер")
+	flag.Parse()
 
 	defaultMeasured := &defaultMeasured{}
 	measuresBuffer := &measuresBuffer{}
