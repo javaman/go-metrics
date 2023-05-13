@@ -1,51 +1,150 @@
 package main
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"testing"
+
+	"github.com/javaman/go-metrics/cmd/server/handlers"
+	"github.com/javaman/go-metrics/cmd/server/services"
+	"github.com/javaman/go-metrics/internal/repository"
+	"github.com/labstack/echo/v4"
+	"github.com/stretchr/testify/assert"
 )
 
-func TestStatuses(t *testing.T) {
-	/*
-		tests := []struct {
-			name           string
-			url            string
-			expectedStatus int
-		}{
-			{
-				name:           "Bad Request wrong metric type",
-				url:            "/update/xxx/name/123",
-				expectedStatus: http.StatusBadRequest,
-			},
-			{
-				name:           "Not Found empty metric name",
-				url:            "/update/counter//123",
-				expectedStatus: http.StatusNotFound,
-			},
-			{
-				name:           "Bad Request wrong metric value",
-				url:            "/update/counter/name/xxx",
-				expectedStatus: http.StatusBadRequest,
-			},
-			{
-				name:           "Good request",
-				url:            "/update/counter/name/123",
-				expectedStatus: http.StatusOK,
-			},
+func TestOne(t *testing.T) {
+	storage := repository.NewInMemoryStorage()
+	storage.SaveGauge("g1", 3.14)
+	storage.SaveCounter("counter1", 42)
+	service := services.NewMetricsService(storage)
+	testData := []struct {
+		path           string
+		method         string
+		expectedStatus int
+		paramNames     []string
+		paramValues    []string
+		handler        func(echo.Context) error
+	}{
+		{
+			"/",
+			http.MethodGet,
+			http.StatusOK,
+			nil,
+			nil,
+			handlers.ListAll(service),
+		},
+		{
+			"/value/:metricType/:measureName",
+			http.MethodGet,
+			http.StatusOK,
+			[]string{"metricType", "measureName"},
+			[]string{"counter", "counter1"},
+			handlers.ValueCounter(service),
+		},
+		{
+			"/value/:metricType/:measureName",
+			http.MethodGet,
+			http.StatusNotFound,
+			[]string{"metricType", "measureName"},
+			[]string{"counter", "counter2"},
+			handlers.ValueCounter(service),
+		},
+		{
+			"/value/:metricType/:measureName",
+			http.MethodGet,
+			http.StatusOK,
+			[]string{"metricType", "measureName"},
+			[]string{"gauge", "g1"},
+			handlers.ValueGauge(service),
+		},
+		{
+			"/value/:metricType/:measureName",
+			http.MethodGet,
+			http.StatusNotFound,
+			[]string{"metricType", "measureName"},
+			[]string{"gauge", "guage2"},
+			handlers.ValueGauge(service),
+		},
+
+		{
+			"/update/:metricType/:measureName/:measureValue",
+			http.MethodPost,
+			http.StatusOK,
+			[]string{"metricType", "measureName", "measureValue"},
+			[]string{"counter", "cx1", "42"},
+			handlers.UpdateCounter(service),
+		},
+		{
+			"/update/:metricType/:measureName/:measureValue",
+			http.MethodPost,
+			http.StatusNotFound,
+			[]string{"metricType", "measureName", "measureValue"},
+			[]string{"counter", "", "42"},
+			handlers.UpdateCounter(service),
+		},
+		{
+			"/update/:metricType/:measureName/:measureValue",
+			http.MethodPost,
+			http.StatusBadRequest,
+			[]string{"metricType", "measureName", "measureValue"},
+			[]string{"counter", "cx3", ""},
+			handlers.UpdateCounter(service),
+		},
+		{
+			"/update/:metricType/:measureName/:measureValue",
+			http.MethodPost,
+			http.StatusBadRequest,
+			[]string{"metricType", "measureName", "measureValue"},
+			[]string{"counter", "cx3", "notanumber"},
+			handlers.UpdateCounter(service),
+		},
+
+		{
+			"/update/:metricType/:measureName/:measureValue",
+			http.MethodPost,
+			http.StatusOK,
+			[]string{"metricType", "measureName", "measureValue"},
+			[]string{"gauge", "gx1", "3.14"},
+			handlers.UpdateGauge(service),
+		},
+		{
+			"/update/:metricType/:measureName/:measureValue",
+			http.MethodPost,
+			http.StatusNotFound,
+			[]string{"metricType", "measureName", "measureValue"},
+			[]string{"gauge", "", "3.14"},
+			handlers.UpdateGauge(service),
+		},
+		{
+			"/update/:metricType/:measureName/:measureValue",
+			http.MethodPost,
+			http.StatusBadRequest,
+			[]string{"metricType", "measureName", "measureValue"},
+			[]string{"gauge", "gx3", ""},
+			handlers.UpdateGauge(service),
+		},
+		{
+			"/update/:metricType/:measureName/:measureValue",
+			http.MethodPost,
+			http.StatusBadRequest,
+			[]string{"metricType", "measureName", "measureValue"},
+			[]string{"gauge", "gx4", "notanumber"},
+			handlers.UpdateGauge(service),
+		},
+	}
+
+	e := echo.New()
+
+	for _, test := range testData {
+		req := httptest.NewRequest(test.method, "/", nil)
+		rec := httptest.NewRecorder()
+		c := e.NewContext(req, rec)
+		c.SetPath(test.path)
+		if test.paramNames != nil {
+			c.SetParamNames(test.paramNames...)
+			c.SetParamValues(test.paramValues...)
 		}
-
-		for _, test := range tests {
-			t.Run(test.name, func(t *testing.T) {
-				request := httptest.NewRequest(http.MethodPost, test.url, nil)
-				w := httptest.NewRecorder()
-				memStorage := &MemStorage{}
-				memStorage.ServeHTTP(w, request)
-
-				result := w.Result()
-				defer result.Body.Close()
-
-				assert.Equal(t, test.expectedStatus, result.StatusCode)
-			})
-		}
-	*/
-
+		test.handler(c)
+		assert.Equal(t, test.expectedStatus, rec.Code)
+	}
 }
