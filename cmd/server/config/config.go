@@ -16,7 +16,7 @@ func InitConfig() *Configuration {
 	flag.StringVar(&config.Address, "a", "localhost:8080", "Адрес сервера")
 	flag.Parse()
 
-	env.Parse(&config)
+	env.Parse(config)
 
 	return config
 }
