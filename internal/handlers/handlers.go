@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/javaman/go-metrics/cmd/server/services"
+	"github.com/javaman/go-metrics/internal/services"
 	"github.com/labstack/echo/v4"
 )
 

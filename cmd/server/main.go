@@ -3,10 +3,10 @@ package main
 import (
 	"net/http"
 
-	"github.com/javaman/go-metrics/cmd/server/config"
-	"github.com/javaman/go-metrics/cmd/server/handlers"
-	"github.com/javaman/go-metrics/cmd/server/services"
+	"github.com/javaman/go-metrics/internal/config"
+	"github.com/javaman/go-metrics/internal/handlers"
 	"github.com/javaman/go-metrics/internal/repository"
+	"github.com/javaman/go-metrics/internal/services"
 
 	"github.com/labstack/echo/v4"
 )
@@ -31,6 +31,6 @@ func main() {
 	e.POST("/update/gauge/:measureName/:measureValue", handlers.UpdateGauge(storage))
 	e.POST("/update/gauge/", handlers.NotFound)
 
-	cfg := config.InitConfig()
+	cfg := config.ConfigureServer()
 	e.Logger.Fatal(e.Start(cfg.Address))
 }

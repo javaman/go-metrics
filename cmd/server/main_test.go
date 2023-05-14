@@ -5,9 +5,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/javaman/go-metrics/cmd/server/handlers"
-	"github.com/javaman/go-metrics/cmd/server/services"
+	"github.com/javaman/go-metrics/internal/handlers"
 	"github.com/javaman/go-metrics/internal/repository"
+	"github.com/javaman/go-metrics/internal/services"
 	"github.com/labstack/echo/v4"
 	"github.com/stretchr/testify/assert"
 )

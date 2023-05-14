@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/go-resty/resty/v2"
-	"github.com/javaman/go-metrics/cmd/agent/config"
+	"github.com/javaman/go-metrics/internal/config"
 )
 
 type MeasureDestination interface {
@@ -158,7 +158,7 @@ func (w *defaultWorker) run() {
 }
 
 func main() {
-	conf := config.Configure()
+	conf := config.ConfigureAgent()
 
 	defaultMeasured := &defaultMeasured{}
 	measuresBuffer := &measuresBuffer{}
