@@ -1,7 +1,5 @@
 package repository
 
-import "log"
-
 type Storage interface {
 	SaveGauge(name string, v float64)
 	GetGauge(name string) (float64, bool)
@@ -26,7 +24,6 @@ func (m *memStorage) GetGauge(name string) (float64, bool) {
 }
 
 func (m *memStorage) SaveGauge(name string, v float64) {
-	log.Printf("Received gauge %s = %f", name, v)
 	m.gauges[name] = v
 }
 
@@ -42,7 +39,6 @@ func (m *memStorage) GetCounter(name string) (int64, bool) {
 }
 
 func (m *memStorage) SaveCounter(name string, v int64) {
-	log.Printf("Received counter %s = %d", name, v)
 	if value, ok := m.counters[name]; ok {
 		m.counters[name] = value + v
 	} else {

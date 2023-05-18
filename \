@@ -48,12 +48,11 @@ func main() {
 		LogValuesFunc: func(e echo.Context, v middleware.RequestLoggerValues) error {
 			sugar.Infow("request",
 				zap.String("URI", v.URI),
-				zap.String("method", v.Method),
-				zap.Int64("latency", v.Latency.Nanoseconds()),
+				zap.Int("method", v.Method),
 			)
 			sugar.Infow("response",
+				zap.String("latency", v.Latency),
 				zap.Int("status", v.Status),
-				zap.Int64("size", v.ResponseSize),
 			)
 			return nil
 		},
