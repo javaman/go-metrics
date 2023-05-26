@@ -12,8 +12,8 @@ import (
 var (
 	ErrIDRequired    error = errors.New("ID Required")
 	ErrInvalidMType  error = errors.New("MType must be counter or delta")
-	ErrDeltaRequired error = errors.New("Delta is required")
-	ErrValueRequired error = errors.New("Value is required")
+	ErrDeltaRequired error = errors.New("delta is required")
+	ErrValueRequired error = errors.New("dalue is required")
 	ErrIDNotFound    error = errors.New("ID not found")
 )
 
