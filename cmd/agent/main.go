@@ -183,7 +183,6 @@ func main() {
 		resty.New(),
 	}
 	measuresServer.SetBaseURL("http://" + conf.Address + "/update")
-	measuresServer.SetDebug(true)
 
 	dw := &defaultWorker{
 		conf.PollInterval,
