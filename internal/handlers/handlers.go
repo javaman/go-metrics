@@ -1,11 +1,13 @@
 package handlers
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
 
+	"github.com/javaman/go-metrics/internal/model"
 	"github.com/javaman/go-metrics/internal/services"
 	"github.com/labstack/echo/v4"
 )
@@ -83,5 +85,51 @@ func ListAll(s services.MetricsService) func(echo.Context) error {
 		})
 		b.WriteString("</table></body></html>")
 		return e.HTML(http.StatusOK, b.String())
+	}
+}
+
+func Update(s services.MetricsService) func(echo.Context) error {
+	return func(c echo.Context) error {
+		var m model.Metrics
+		err := json.NewDecoder(c.Request().Body).Decode(&m)
+		if err != nil {
+			return c.String(http.StatusBadRequest, err.Error())
+		}
+		if res, err := s.Save(&m); err != nil {
+			switch err {
+			case services.ErrIDRequired:
+				return NotFound(c)
+			case services.ErrInvalidMType:
+				fallthrough
+			case services.ErrDeltaRequired:
+				fallthrough
+			case services.ErrValueRequired:
+				fallthrough
+			default:
+				return BadRequest(c)
+			}
+		} else {
+			return c.JSON(http.StatusOK, res)
+		}
+	}
+}
+
+func Value(s services.MetricsService) func(echo.Context) error {
+	return func(c echo.Context) error {
+		var m model.Metrics
+		err := json.NewDecoder(c.Request().Body).Decode(&m)
+		if err != nil {
+			return c.String(http.StatusBadRequest, err.Error())
+		}
+		if res, err := s.Value(&m); err != nil {
+			switch err {
+			case services.ErrIDNotFound:
+				return c.NoContent(http.StatusNotFound)
+			default:
+				return BadRequest(c)
+			}
+		} else {
+			return c.JSON(http.StatusOK, res)
+		}
 	}
 }

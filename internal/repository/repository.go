@@ -39,11 +39,7 @@ func (m *memStorage) GetCounter(name string) (int64, bool) {
 }
 
 func (m *memStorage) SaveCounter(name string, v int64) {
-	if value, ok := m.counters[name]; ok {
-		m.counters[name] = value + v
-	} else {
-		m.counters[name] = v
-	}
+	m.counters[name] = v
 }
 
 func (m *memStorage) AllCounters(f func(string, int64)) {
