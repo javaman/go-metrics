@@ -109,6 +109,7 @@ func Update(s services.MetricsService) func(echo.Context) error {
 				return BadRequest(c)
 			}
 		} else {
+			//
 			return c.JSON(http.StatusOK, res)
 		}
 	}
