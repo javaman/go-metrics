@@ -94,6 +94,10 @@ func (d *defaultMeasured) captureMetrics(destination MeasureDestination) {
 	GaugeMeasure{float64(memStats.StackSys), "StackSys"}.save(destination)
 	GaugeMeasure{float64(memStats.Sys), "Sys"}.save(destination)
 	GaugeMeasure{float64(memStats.TotalAlloc), "TotalAlloc"}.save(destination)
+	GaugeMeasure{float64(memStats.NumForcedGC), "NumForcedGC"}.save(destination)
+	GaugeMeasure{float64(memStats.MCacheSys), "MCacheSys"}.save(destination)
+	GaugeMeasure{float64(memStats.MSpanInuse), "MSpanInuse"}.save(destination)
+	GaugeMeasure{float64(memStats.NumGC), "NumGC"}.save(destination)
 
 	CounterMeasure{d.pollCount, "PollCount"}.save(destination)
 	d.pollCount += 1
