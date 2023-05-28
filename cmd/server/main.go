@@ -60,6 +60,8 @@ func main() {
 			return nil
 		},
 	}))
+	e.Use(handlers.Decompress)
+	e.Use(handlers.Compress)
 
 	e.Logger.Fatal(e.Start(cfg.Address))
 }
