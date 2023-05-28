@@ -29,10 +29,10 @@ func main() {
 	e.GET("/update/*", func(c echo.Context) error { return c.NoContent(http.StatusMethodNotAllowed) })
 	e.POST("/update/:measureType/*", handlers.BadRequest)
 
-	e.POST("/update/counter/:measureName/:measureValue", handlers.UpdateCounter(service))
-	e.POST("/update/counter/", handlers.NotFound)
-	e.POST("/update/gauge/:measureName/:measureValue", handlers.UpdateGauge(service))
-	e.POST("/update/gauge/", handlers.NotFound)
+	e.POST("/updater/counter/:measureName/:measureValue", handlers.UpdateCounter(service))
+	e.POST("/updater/counter/", handlers.NotFound)
+	e.POST("/updater/gauge/:measureName/:measureValue", handlers.UpdateGauge(service))
+	e.POST("/updater/gauge/", handlers.NotFound)
 	e.POST("/update/", handlers.Update(service))
 
 	cfg := config.ConfigureServer()
