@@ -58,21 +58,23 @@ func Decompress(next echo.HandlerFunc) echo.HandlerFunc {
 				c.Request().Body = decompressingReader
 				return next(c)
 			} else {
-				return c.String(http.StatusInternalServerError, err.Error())
+				return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 			}
 		}
 	}
 }
 
 type compressWriter struct {
-	w  http.ResponseWriter
-	zw *gzip.Writer
+	w         http.ResponseWriter
+	zw        *gzip.Writer
+	wroteBody bool
 }
 
 func newCompressWriter(w http.ResponseWriter) *compressWriter {
 	return &compressWriter{
-		w:  w,
-		zw: gzip.NewWriter(w),
+		w:         w,
+		zw:        gzip.NewWriter(w),
+		wroteBody: false,
 	}
 }
 
@@ -81,13 +83,12 @@ func (c *compressWriter) Header() http.Header {
 }
 
 func (c *compressWriter) Write(p []byte) (int, error) {
+	c.wroteBody = true
 	return c.zw.Write(p)
 }
 
 func (c *compressWriter) WriteHeader(statusCode int) {
-	if statusCode < 300 {
-		c.w.Header().Set("Content-Encoding", ContentEncodingGzip)
-	}
+	c.w.Header().Del(echo.HeaderContentLength)
 	c.w.WriteHeader(statusCode)
 }
 
@@ -98,8 +99,20 @@ func (c *compressWriter) Close() error {
 func Compress(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		if strings.Contains(c.Request().Header.Get("Accept-Encoding"), ContentEncodingGzip) {
-			cw := newCompressWriter(c.Response().Writer)
-			defer cw.Close()
+			c.Response().Header().Set("Content-Encoding", ContentEncodingGzip)
+			rw := c.Response().Writer
+			cw := newCompressWriter(rw)
+			cw.zw.Reset(rw)
+			defer func() {
+				if !cw.wroteBody {
+					if c.Response().Header().Get("Content-Encoding") == ContentEncodingGzip {
+						c.Response().Header().Del("Content-Encoding")
+					}
+					c.Response().Writer = rw
+					cw.zw.Reset(io.Discard)
+				}
+				cw.zw.Close()
+			}()
 			c.Response().Writer = cw
 			return next(c)
 		} else {
