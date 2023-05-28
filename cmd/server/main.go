@@ -35,12 +35,6 @@ func main() {
 	e.POST("/update/gauge/", handlers.NotFound)
 	e.POST("/update/", handlers.Update(service))
 
-	e.POST("/updater/counter/:measureName/:measureValue", handlers.UpdateCounter(service))
-	e.POST("/updater/counter/", handlers.NotFound)
-	e.POST("/updater/gauge/:measureName/:measureValue", handlers.UpdateGauge(service))
-	e.POST("/updater/gauge/", handlers.NotFound)
-	e.POST("/updater/", handlers.Update(service))
-
 	cfg := config.ConfigureServer()
 
 	logger, _ := zap.NewProduction()
