@@ -108,8 +108,8 @@ func (m *memStorage) UnmarshalJSON(b []byte) error {
 	if err != nil {
 		return err
 	}
-	s.counters = tmp.Counters
-	s.gauges = tmp.Gauges
+	m.counters = tmp.Counters
+	m.gauges = tmp.Gauges
 	return nil
 }
 
@@ -118,7 +118,7 @@ func (m *memStorage) MarshalJSON() ([]byte, error) {
 		Counters map[string]int64   `json:"counters"`
 		Gauges   map[string]float64 `json:"gauges"`
 	}{
-		Counters: s.counters,
-		Gauges:   s.gauges,
+		Counters: m.counters,
+		Gauges:   m.gauges,
 	})
 }
