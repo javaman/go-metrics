@@ -37,6 +37,10 @@ func (m *mockStorage) AllCounters(f func(string, int64)) {
 	m.Called(f)
 }
 
+func (m *mockStorage) Save(fname string) {
+	m.Called(fname)
+}
+
 func TestSaveGauge(t *testing.T) {
 	theMock := &mockStorage{}
 	theMock.On("SaveGauge", "one", 3.14)
