@@ -98,7 +98,7 @@ func (m *wrappingSaveToFile) SaveGauge(name string, v float64) {
 	m.Storage.Save(m.fileName)
 }
 
-func (s *memStorage) UnmarshalJSON(b []byte) error {
+func (m *memStorage) UnmarshalJSON(b []byte) error {
 	fmt.Println("Here")
 	var tmp struct {
 		Counters map[string]int64   `json:"counters"`
@@ -113,7 +113,7 @@ func (s *memStorage) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-func (s *memStorage) MarshalJSON() ([]byte, error) {
+func (m *memStorage) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
 		Counters map[string]int64   `json:"counters"`
 		Gauges   map[string]float64 `json:"gauges"`
