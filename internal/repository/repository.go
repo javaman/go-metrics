@@ -1,5 +1,11 @@
 package repository
 
+import (
+	"encoding/json"
+	"fmt"
+	"os"
+)
+
 type Storage interface {
 	SaveGauge(name string, v float64)
 	GetGauge(name string) (float64, bool)
@@ -7,6 +13,28 @@ type Storage interface {
 	SaveCounter(name string, v int64)
 	GetCounter(name string) (int64, bool)
 	AllCounters(func(string, int64))
+	Save(file string)
+}
+
+func MakeStorageFlushedOnEachCall(s Storage, fname string) Storage {
+	return &wrappingSaveToFile{
+		Storage:  s,
+		fileName: fname,
+	}
+}
+
+func NewInMemoryStorageFromFile(file string) Storage {
+	var result memStorage
+	if data, err := os.ReadFile(file); err == nil {
+		json.Unmarshal(data, &result)
+	}
+	if result.counters == nil {
+		result.counters = make(map[string]int64)
+	}
+	if result.gauges == nil {
+		result.gauges = make(map[string]float64)
+	}
+	return &result
 }
 
 func NewInMemoryStorage() *memStorage {
@@ -16,6 +44,13 @@ func NewInMemoryStorage() *memStorage {
 type memStorage struct {
 	counters map[string]int64
 	gauges   map[string]float64
+}
+
+func (m *memStorage) Save(fname string) {
+	data, err := json.MarshalIndent(m, "", "   ")
+	if err == nil {
+		os.WriteFile(fname, data, 0666)
+	}
 }
 
 func (m *memStorage) GetGauge(name string) (float64, bool) {
@@ -46,4 +81,44 @@ func (m *memStorage) AllCounters(f func(string, int64)) {
 	for k, v := range m.counters {
 		f(k, v)
 	}
+}
+
+type wrappingSaveToFile struct {
+	Storage
+	fileName string
+}
+
+func (m *wrappingSaveToFile) SaveCounter(name string, v int64) {
+	m.Storage.SaveCounter(name, v)
+	m.Storage.Save(m.fileName)
+}
+
+func (m *wrappingSaveToFile) SaveGauge(name string, v float64) {
+	m.Storage.SaveGauge(name, v)
+	m.Storage.Save(m.fileName)
+}
+
+func (s *memStorage) UnmarshalJSON(b []byte) error {
+	fmt.Println("Here")
+	var tmp struct {
+		Counters map[string]int64   `json:"counters"`
+		Gauges   map[string]float64 `json:"gauges"`
+	}
+	err := json.Unmarshal(b, &tmp)
+	if err != nil {
+		return err
+	}
+	s.counters = tmp.Counters
+	s.gauges = tmp.Gauges
+	return nil
+}
+
+func (s *memStorage) MarshalJSON() ([]byte, error) {
+	return json.Marshal(struct {
+		Counters map[string]int64   `json:"counters"`
+		Gauges   map[string]float64 `json:"gauges"`
+	}{
+		Counters: s.counters,
+		Gauges:   s.gauges,
+	})
 }

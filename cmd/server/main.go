@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/javaman/go-metrics/internal/config"
@@ -15,8 +16,27 @@ import (
 
 func main() {
 
-	storage := repository.NewInMemoryStorage()
-	service := services.NewMetricsService(storage)
+	cfg := config.ConfigureServer()
+
+	var storage repository.Storage
+
+	if cfg.Restore {
+		storage = repository.NewInMemoryStorageFromFile(cfg.FileStoragePath)
+	} else {
+		storage = repository.NewInMemoryStorage()
+	}
+
+	var service services.MetricsService
+
+	if cfg.StoreInterval > 0 {
+		fmt.Println("Here")
+		service = services.NewMetricsService(storage)
+		services.FlushStorageInBackground(storage, cfg.FileStoragePath, cfg.StoreInterval)
+	} else {
+		fmt.Println("There")
+		storage = repository.MakeStorageFlushedOnEachCall(storage, cfg.FileStoragePath)
+		service = services.NewMetricsService(storage)
+	}
 
 	e := echo.New()
 
@@ -34,8 +54,6 @@ func main() {
 	e.POST("/update/gauge/:measureName/:measureValue", handlers.UpdateGauge(service))
 	e.POST("/update/gauge/", handlers.NotFound)
 	e.POST("/update/", handlers.Update(service))
-
-	cfg := config.ConfigureServer()
 
 	logger, _ := zap.NewProduction()
 	defer logger.Sync()

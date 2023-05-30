@@ -3,6 +3,7 @@ package services
 import (
 	"errors"
 	"strings"
+	"time"
 
 	"github.com/go-playground/validator/v10"
 	"github.com/javaman/go-metrics/internal/model"
@@ -128,4 +129,13 @@ func (dm *defaultMetricsService) Value(m *model.Metrics) (*model.Metrics, error)
 
 func NewMetricsService(repository repository.Storage) *defaultMetricsService {
 	return &defaultMetricsService{repository, validator.New()}
+}
+
+func FlushStorageInBackground(storage repository.Storage, fname string, interval int) {
+	go func() {
+		for {
+			time.Sleep(time.Duration(interval) * time.Second)
+			storage.Save(fname)
+		}
+	}()
 }
