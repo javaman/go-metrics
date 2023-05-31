@@ -1,127 +1,19 @@
 package handlers
 
 import (
-	"compress/gzip"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"strconv"
 	"strings"
 
+	mymiddleware "github.com/javaman/go-metrics/internal/middleware"
 	"github.com/javaman/go-metrics/internal/model"
 	"github.com/javaman/go-metrics/internal/services"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"go.uber.org/zap"
 )
-
-const (
-	ContentEncodingGzip = "gzip"
-)
-
-type compressReader struct {
-	r  io.ReadCloser
-	zr *gzip.Reader
-}
-
-func (c *compressReader) Read(p []byte) (n int, err error) {
-	return c.zr.Read(p)
-}
-
-func (c *compressReader) Close() error {
-	if err := c.r.Close(); err != nil {
-		return err
-	}
-	return c.zr.Close()
-}
-
-func newCompressReader(r io.ReadCloser) (*compressReader, error) {
-	zr, err := gzip.NewReader(r)
-	if err != nil {
-		return nil, err
-	}
-
-	return &compressReader{
-		r:  r,
-		zr: zr,
-	}, nil
-}
-
-func Decompress(next echo.HandlerFunc) echo.HandlerFunc {
-	return func(c echo.Context) error {
-		if c.Request().Header.Get("Content-Encoding") != ContentEncodingGzip {
-			return next(c)
-		} else {
-			b := c.Request().Body
-			defer b.Close()
-			if decompressingReader, err := newCompressReader(b); err == nil {
-				defer decompressingReader.Close()
-				c.Request().Body = decompressingReader
-				return next(c)
-			} else {
-				return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
-			}
-		}
-	}
-}
-
-type compressWriter struct {
-	w         http.ResponseWriter
-	zw        *gzip.Writer
-	wroteBody bool
-}
-
-func newCompressWriter(w http.ResponseWriter) *compressWriter {
-	return &compressWriter{
-		w:         w,
-		zw:        gzip.NewWriter(w),
-		wroteBody: false,
-	}
-}
-
-func (c *compressWriter) Header() http.Header {
-	return c.w.Header()
-}
-
-func (c *compressWriter) Write(p []byte) (int, error) {
-	c.wroteBody = true
-	return c.zw.Write(p)
-}
-
-func (c *compressWriter) WriteHeader(statusCode int) {
-	c.w.Header().Del(echo.HeaderContentLength)
-	c.w.WriteHeader(statusCode)
-}
-
-func (c *compressWriter) Close() error {
-	return c.zw.Close()
-}
-
-func Compress(next echo.HandlerFunc) echo.HandlerFunc {
-	return func(c echo.Context) error {
-		if strings.Contains(c.Request().Header.Get("Accept-Encoding"), ContentEncodingGzip) {
-			c.Response().Header().Set("Content-Encoding", ContentEncodingGzip)
-			rw := c.Response().Writer
-			cw := newCompressWriter(rw)
-			cw.zw.Reset(rw)
-			defer func() {
-				if !cw.wroteBody {
-					if c.Response().Header().Get("Content-Encoding") == ContentEncodingGzip {
-						c.Response().Header().Del("Content-Encoding")
-					}
-					c.Response().Writer = rw
-					cw.zw.Reset(io.Discard)
-				}
-				cw.zw.Close()
-			}()
-			c.Response().Writer = cw
-			return next(c)
-		} else {
-			return next(c)
-		}
-	}
-}
 
 func BadRequest(c echo.Context) error {
 	return c.NoContent(http.StatusBadRequest)
@@ -206,23 +98,16 @@ func Update(s services.MetricsService) func(echo.Context) error {
 		if err != nil {
 			return c.String(http.StatusBadRequest, err.Error())
 		}
-		if res, err := s.Save(&m); err != nil {
+		res, err := s.Save(&m)
+		if err != nil {
 			switch err {
 			case services.ErrIDRequired:
 				return NotFound(c)
-			case services.ErrInvalidMType:
-				fallthrough
-			case services.ErrDeltaRequired:
-				fallthrough
-			case services.ErrValueRequired:
-				fallthrough
 			default:
 				return BadRequest(c)
 			}
-		} else {
-			//
-			return c.JSON(http.StatusOK, res)
 		}
+		return c.JSON(http.StatusOK, res)
 	}
 }
 
@@ -287,7 +172,7 @@ func New(service services.MetricsService) *echo.Echo {
 			return nil
 		},
 	}))
-	e.Use(Compress)
-	e.Use(Decompress)
+	e.Use(mymiddleware.Compress)
+	e.Use(mymiddleware.Decompress)
 	return e
 }
