@@ -91,7 +91,7 @@ func (dm *defaultMetricsService) saveGaugeStruct(m *model.Metrics) (*model.Metri
 		return nil, ErrValueRequired
 	}
 	dm.SaveGauge(m.ID, *m.Value)
-	var newValue float64 = *m.Value
+	newValue := *m.Value
 	result.Value = &newValue
 	return result, nil
 }
