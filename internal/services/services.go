@@ -111,7 +111,7 @@ func (dm *defaultMetricsService) valueCounterStruct(m *model.Metrics) (*model.Me
 	return nil, ErrIDNotFound
 }
 
-func (dm *defaultMetricsService) valueCounterStruct(m *model.Metrics) (*model.Metrics, error) {
+func (dm *defaultMetricsService) valueGaugeStruct(m *model.Metrics) (*model.Metrics, error) {
 	if value, ok := dm.GetGauge(m.ID); ok {
 		m.Value = &value
 		return m, nil
@@ -119,16 +119,13 @@ func (dm *defaultMetricsService) valueCounterStruct(m *model.Metrics) (*model.Me
 	return nil, ErrIDNotFound
 }
 
-func (dm *defaultMetricsService) valueGaugeStruct(m *model.Metrics) (*model.Metrics, error) {
-}
-
 func (dm *defaultMetricsService) Value(m *model.Metrics) (*model.Metrics, error) {
 	result := &model.Metrics{ID: m.ID, MType: m.MType}
 	switch m.MType {
 	case "counter":
-		return valueCounterStruct(result)
+		return dm.valueCounterStruct(result)
 	case "gauge":
-		return valueGaugeStruct(result)
+		return dm.valueGaugeStruct(result)
 	default:
 		return nil, ErrInvalidMType
 	}
