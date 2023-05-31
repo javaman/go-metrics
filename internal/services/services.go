@@ -22,7 +22,7 @@ type MetricsService interface {
 	SaveGauge(name string, v float64)
 	GetGauge(name string) (float64, bool)
 	AllGauges(func(string, float64))
-	SaveCounter(name string, v int64)
+	SaveCounter(name string, v int64) int64
 	GetCounter(name string) (int64, bool)
 	AllCounters(func(string, int64))
 	Save(m *model.Metrics) (*model.Metrics, error)
@@ -46,15 +46,11 @@ func (dm *defaultMetricsService) AllGauges(f func(string, float64)) {
 	dm.storage.AllGauges(f)
 }
 
-func (dm *defaultMetricsService) saveCounter(name string, v int64) int64 {
+func (dm *defaultMetricsService) SaveCounter(name string, v int64) int64 {
 	value, _ := dm.storage.GetCounter(name)
 	result := value + v
 	dm.storage.SaveCounter(name, result)
 	return result
-}
-
-func (dm *defaultMetricsService) SaveCounter(name string, v int64) {
-	dm.saveCounter(name, v)
 }
 
 func (dm *defaultMetricsService) GetCounter(name string) (int64, bool) {
@@ -73,7 +69,7 @@ func (dm *defaultMetricsService) saveCounterStruct(m *model.Metrics) (*model.Met
 	if m.Delta == nil {
 		return nil, ErrDeltaRequired
 	}
-	newDelta := dm.saveCounter(m.ID, *m.Delta)
+	newDelta := dm.SaveCounter(m.ID, *m.Delta)
 	result.Delta = &newDelta
 	return result, nil
 }

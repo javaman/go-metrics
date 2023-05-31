@@ -37,7 +37,7 @@ func (m *mockStorage) AllCounters(f func(string, int64)) {
 	m.Called(f)
 }
 
-func (m *mockStorage) Save(fname string) {
+func (m *mockStorage) WriteToFile(fname string) {
 	m.Called(fname)
 }
 
