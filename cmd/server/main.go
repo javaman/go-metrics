@@ -18,15 +18,13 @@ func main() {
 		storage = repository.NewInMemoryStorage()
 	}
 
-	var service services.MetricsService
-
 	if cfg.StoreInterval > 0 {
-		service = services.NewMetricsService(storage)
 		services.FlushStorageInBackground(storage, cfg.FileStoragePath, cfg.StoreInterval)
 	} else {
 		storage = repository.MakeStorageFlushedOnEachCall(storage, cfg.FileStoragePath)
-		service = services.NewMetricsService(storage)
 	}
+
+	service := services.NewMetricsService(storage)
 
 	e := handlers.New(service)
 

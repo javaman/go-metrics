@@ -118,16 +118,16 @@ func Value(s services.MetricsService) func(echo.Context) error {
 		if err != nil {
 			return c.String(http.StatusBadRequest, err.Error())
 		}
-		if res, err := s.Value(&m); err != nil {
+		res, err := s.Value(&m)
+		if err != nil {
 			switch err {
 			case services.ErrIDNotFound:
 				return c.NoContent(http.StatusNotFound)
 			default:
 				return BadRequest(c)
 			}
-		} else {
-			return c.JSON(http.StatusOK, res)
 		}
+		return c.JSON(http.StatusOK, res)
 	}
 }
 

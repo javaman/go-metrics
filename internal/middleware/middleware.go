@@ -47,12 +47,12 @@ func Decompress(next echo.HandlerFunc) echo.HandlerFunc {
 			return next(c)
 		}
 		b := c.Request().Body
-		if decompressingReader, err := newCompressReader(b); err == nil {
+		decompressingReader, err := newCompressReader(b)
+		if err == nil {
 			c.Request().Body = decompressingReader
 			return next(c)
-		} else {
-			return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 		}
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
 }
 
