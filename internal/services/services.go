@@ -69,35 +69,39 @@ func (dm *defaultMetricsService) AllCounters(f func(string, int64)) {
 	dm.storage.AllCounters(f)
 }
 
+func (dm *defaultMetricsService) saveCounterStruct(m *model.Metrics) (*model.Metrics, error) {
+	result := &model.Metrics{ID: m.ID, MType: m.MType}
+	if strings.TrimSpace(m.ID) == "" {
+		return nil, ErrIDRequired
+	}
+	if m.Delta == nil {
+		return nil, ErrDeltaRequired
+	}
+	newDelta := dm.saveCounter(m.ID, *m.Delta)
+	result.Delta = &newDelta
+	return result, nil
+}
+
+func (dm *defaultMetricsService) saveGaugeStruct(m *model.Metrics) (*model.Metrics, error) {
+	result := &model.Metrics{ID: m.ID, MType: m.MType}
+	if strings.TrimSpace(m.ID) == "" {
+		return nil, ErrIDRequired
+	}
+	if m.Value == nil {
+		return nil, ErrValueRequired
+	}
+	dm.SaveGauge(m.ID, *m.Value)
+	var newValue float64 = *m.Value
+	result.Value = &newValue
+	return result, nil
+}
+
 func (dm *defaultMetricsService) Save(m *model.Metrics) (*model.Metrics, error) {
 	switch metricType := m.MType; metricType {
 	case "counter":
-		if strings.TrimSpace(m.ID) == "" {
-			return nil, ErrIDRequired
-		}
-		if m.Delta == nil {
-			return nil, ErrDeltaRequired
-		}
-		newValue := dm.saveCounter(m.ID, *m.Delta)
-		retVal := &model.Metrics{}
-		retVal.ID = m.ID
-		retVal.MType = m.MType
-		retVal.Delta = &newValue
-		return retVal, nil
+		return dm.saveCounterStruct(m)
 	case "gauge":
-		if strings.TrimSpace(m.ID) == "" {
-			return nil, ErrIDRequired
-		}
-		if m.Value == nil {
-			return nil, ErrValueRequired
-		}
-		retVal := &model.Metrics{}
-		dm.SaveGauge(m.ID, *m.Value)
-		newValue := *m.Value
-		retVal.ID = m.ID
-		retVal.MType = m.MType
-		retVal.Value = &newValue
-		return retVal, nil
+		return dm.saveGaugeStruct(m)
 	default:
 		return nil, ErrInvalidMType
 	}
