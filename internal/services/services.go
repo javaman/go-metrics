@@ -47,14 +47,10 @@ func (dm *defaultMetricsService) AllGauges(f func(string, float64)) {
 }
 
 func (dm *defaultMetricsService) saveCounter(name string, v int64) int64 {
-	if value, ok := dm.storage.GetCounter(name); ok {
-		value += v
-		dm.storage.SaveCounter(name, value)
-		return value
-	} else {
-		dm.storage.SaveCounter(name, v)
-		return v
-	}
+	value, _ := dm.storage.GetCounter(name)
+	result := value + v
+	dm.storage.SaveCounter(name, result)
+	return result
 }
 
 func (dm *defaultMetricsService) SaveCounter(name string, v int64) {
@@ -143,7 +139,7 @@ func FlushStorageInBackground(storage repository.Storage, fname string, interval
 	go func() {
 		for {
 			time.Sleep(time.Duration(interval) * time.Second)
-			storage.Save(fname)
+			storage.WriteToFile(fname)
 		}
 	}()
 }

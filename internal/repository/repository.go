@@ -13,7 +13,7 @@ type Storage interface {
 	SaveCounter(name string, v int64)
 	GetCounter(name string) (int64, bool)
 	AllCounters(func(string, int64))
-	Save(file string)
+	WriteToFile(file string)
 }
 
 func MakeStorageFlushedOnEachCall(s Storage, fname string) Storage {
@@ -46,7 +46,7 @@ type memStorage struct {
 	gauges   map[string]float64
 }
 
-func (m *memStorage) Save(fname string) {
+func (m *memStorage) WriteToFile(fname string) {
 	data, err := json.MarshalIndent(m, "", "   ")
 	if err == nil {
 		os.WriteFile(fname, data, 0666)
@@ -90,12 +90,12 @@ type wrappingSaveToFile struct {
 
 func (m *wrappingSaveToFile) SaveCounter(name string, v int64) {
 	m.Storage.SaveCounter(name, v)
-	m.Storage.Save(m.fileName)
+	m.Storage.WriteToFile(m.fileName)
 }
 
 func (m *wrappingSaveToFile) SaveGauge(name string, v float64) {
 	m.Storage.SaveGauge(name, v)
-	m.Storage.Save(m.fileName)
+	m.Storage.WriteToFile(m.fileName)
 }
 
 func (m *memStorage) UnmarshalJSON(b []byte) error {
