@@ -103,25 +103,32 @@ func (dm *defaultMetricsService) Save(m *model.Metrics) (*model.Metrics, error) 
 	}
 }
 
+func (dm *defaultMetricsService) valueCounterStruct(m *model.Metrics) (*model.Metrics, error) {
+	if delta, ok := dm.GetCounter(m.ID); ok {
+		m.Delta = &delta
+		return m, nil
+	}
+	return nil, ErrIDNotFound
+}
+
+func (dm *defaultMetricsService) valueCounterStruct(m *model.Metrics) (*model.Metrics, error) {
+	if value, ok := dm.GetGauge(m.ID); ok {
+		m.Value = &value
+		return m, nil
+	}
+	return nil, ErrIDNotFound
+}
+
+func (dm *defaultMetricsService) valueGaugeStruct(m *model.Metrics) (*model.Metrics, error) {
+}
+
 func (dm *defaultMetricsService) Value(m *model.Metrics) (*model.Metrics, error) {
-	result := &model.Metrics{}
-	result.ID = m.ID
-	result.MType = m.MType
+	result := &model.Metrics{ID: m.ID, MType: m.MType}
 	switch m.MType {
 	case "counter":
-		if delta, ok := dm.GetCounter(m.ID); ok {
-			result.Delta = &delta
-			return result, nil
-		} else {
-			return nil, ErrIDNotFound
-		}
+		return valueCounterStruct(result)
 	case "gauge":
-		if value, ok := dm.GetGauge(m.ID); ok {
-			result.Value = &value
-			return result, nil
-		} else {
-			return nil, ErrIDNotFound
-		}
+		return valueGaugeStruct(result)
 	default:
 		return nil, ErrInvalidMType
 	}
