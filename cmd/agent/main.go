@@ -111,10 +111,7 @@ type measuresServer struct {
 }
 
 func (s *measuresServer) saveCounter(m Measure, v int64) {
-	j := &model.Metrics{}
-	j.ID = m.name()
-	j.MType = "counter"
-	j.Delta = &v
+	j := &model.Metrics{ID: m.name(), MType: "counter", Delta: &v}
 	encoded, _ := json.Marshal(*j)
 	s.R().
 		SetHeader("Content-Type", "application/json").
@@ -123,10 +120,7 @@ func (s *measuresServer) saveCounter(m Measure, v int64) {
 }
 
 func (s *measuresServer) saveGauge(m Measure, v float64) {
-	j := &model.Metrics{}
-	j.ID = m.name()
-	j.MType = "gauge"
-	j.Value = &v
+	j := &model.Metrics{ID: m.name(), MType: "gauge", Value: &v}
 	encoded, _ := json.Marshal(j)
 	s.R().
 		SetHeader("Content-Type", "application/json").
