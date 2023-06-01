@@ -7,7 +7,10 @@ import (
 )
 
 type ServerConfiguration struct {
-	Address string `env:"ADDRESS"`
+	Address         string `env:"ADDRESS"`
+	StoreInterval   int    `env:"STORE_INTERVAL"`
+	FileStoragePath string `env:"FILE_STORAGE_PATH"`
+	Restore         bool   `env:"RESTORE"`
 }
 
 type AgentConfiguration struct {
@@ -17,14 +20,17 @@ type AgentConfiguration struct {
 }
 
 func ConfigureServer() *ServerConfiguration {
-	config := &ServerConfiguration{}
+	conf := &ServerConfiguration{}
 
-	flag.StringVar(&config.Address, "a", "localhost:8080", "Адрес сервера")
+	flag.StringVar(&conf.Address, "a", "localhost:8080", "Адрес сервера")
+	flag.IntVar(&conf.StoreInterval, "i", 300, "Интервал сохранения на диск. 0 - синхронно")
+	flag.StringVar(&conf.FileStoragePath, "f", "/tmp/metrics-db.json", "Файл, где сохраняются метрики")
+	flag.BoolVar(&conf.Restore, "r", false, "Загрузить ли ранее сохраненные значения")
 	flag.Parse()
 
-	env.Parse(config)
+	env.Parse(conf)
 
-	return config
+	return conf
 }
 
 func ConfigureAgent() *AgentConfiguration {

@@ -1,13 +1,14 @@
 package main
 
 import (
-	"fmt"
+	"encoding/json"
 	"math/rand"
 	"runtime"
 	"time"
 
 	"github.com/go-resty/resty/v2"
 	"github.com/javaman/go-metrics/internal/config"
+	"github.com/javaman/go-metrics/internal/model"
 )
 
 type MeasureDestination interface {
@@ -93,6 +94,10 @@ func (d *defaultMeasured) captureMetrics(destination MeasureDestination) {
 	GaugeMeasure{float64(memStats.StackSys), "StackSys"}.save(destination)
 	GaugeMeasure{float64(memStats.Sys), "Sys"}.save(destination)
 	GaugeMeasure{float64(memStats.TotalAlloc), "TotalAlloc"}.save(destination)
+	GaugeMeasure{float64(memStats.NumForcedGC), "NumForcedGC"}.save(destination)
+	GaugeMeasure{float64(memStats.MCacheSys), "MCacheSys"}.save(destination)
+	GaugeMeasure{float64(memStats.MSpanInuse), "MSpanInuse"}.save(destination)
+	GaugeMeasure{float64(memStats.NumGC), "NumGC"}.save(destination)
 
 	CounterMeasure{d.pollCount, "PollCount"}.save(destination)
 	d.pollCount += 1
@@ -106,11 +111,21 @@ type measuresServer struct {
 }
 
 func (s *measuresServer) saveCounter(m Measure, v int64) {
-	s.R().Post("/counter/" + m.name() + "/" + fmt.Sprintf("%d", v))
+	j := &model.Metrics{ID: m.name(), MType: "counter", Delta: &v}
+	encoded, _ := json.Marshal(*j)
+	s.R().
+		SetHeader("Content-Type", "application/json").
+		SetBody(string(encoded[:])).
+		Post("/")
 }
 
 func (s *measuresServer) saveGauge(m Measure, v float64) {
-	s.R().Post("/gauge/" + m.name() + "/" + fmt.Sprintf("%f", v))
+	j := &model.Metrics{ID: m.name(), MType: "gauge", Value: &v}
+	encoded, _ := json.Marshal(j)
+	s.R().
+		SetHeader("Content-Type", "application/json").
+		SetBody(string(encoded[:])).
+		Post("/")
 }
 
 func gcd(a, b int) int {
@@ -166,7 +181,6 @@ func main() {
 		resty.New(),
 	}
 	measuresServer.SetBaseURL("http://" + conf.Address + "/update")
-	measuresServer.SetDebug(true)
 
 	dw := &defaultWorker{
 		conf.PollInterval,
