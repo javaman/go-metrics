@@ -12,10 +12,10 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-type mockDb struct {
+type mockDB struct {
 }
 
-func (d *mockDb) Ping() error {
+func (d *mockDB) Ping() error {
 	return nil
 }
 
