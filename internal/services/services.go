@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-playground/validator/v10"
+	"github.com/javaman/go-metrics/internal/db"
 	"github.com/javaman/go-metrics/internal/model"
 	"github.com/javaman/go-metrics/internal/repository"
 )
@@ -27,11 +27,12 @@ type MetricsService interface {
 	AllCounters(func(string, int64))
 	Save(m *model.Metrics) (*model.Metrics, error)
 	Value(m *model.Metrics) (*model.Metrics, error)
+	Ping() error
 }
 
 type defaultMetricsService struct {
-	storage   repository.Storage
-	validator *validator.Validate
+	storage repository.Storage
+	db      db.Database
 }
 
 func (dm *defaultMetricsService) SaveGauge(name string, v float64) {
@@ -127,8 +128,12 @@ func (dm *defaultMetricsService) Value(m *model.Metrics) (*model.Metrics, error)
 	}
 }
 
-func NewMetricsService(repository repository.Storage) *defaultMetricsService {
-	return &defaultMetricsService{repository, validator.New()}
+func (dm *defaultMetricsService) Ping() error {
+	return dm.db.Ping()
+}
+
+func NewMetricsService(repository repository.Storage, db db.Database) *defaultMetricsService {
+	return &defaultMetricsService{repository, db}
 }
 
 func FlushStorageInBackground(storage repository.Storage, fname string, interval int) {

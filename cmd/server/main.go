@@ -1,13 +1,16 @@
 package main
 
 import (
+	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/javaman/go-metrics/internal/config"
+	"github.com/javaman/go-metrics/internal/db"
 	"github.com/javaman/go-metrics/internal/handlers"
 	"github.com/javaman/go-metrics/internal/repository"
 	"github.com/javaman/go-metrics/internal/services"
 )
 
 func main() {
+
 	cfg := config.ConfigureServer()
 
 	var storage repository.Storage
@@ -24,7 +27,7 @@ func main() {
 		storage = repository.MakeStorageFlushedOnEachCall(storage, cfg.FileStoragePath)
 	}
 
-	service := services.NewMetricsService(storage)
+	service := services.NewMetricsService(storage, db.New(cfg.DbDsn))
 
 	e := handlers.New(service)
 
