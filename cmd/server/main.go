@@ -27,7 +27,7 @@ func main() {
 		storage = repository.MakeStorageFlushedOnEachCall(storage, cfg.FileStoragePath)
 	}
 
-	service := services.NewMetricsService(storage, db.New(cfg.DbDsn))
+	service := services.NewMetricsService(storage, db.New(cfg.DBDsn))
 
 	e := handlers.New(service)
 
