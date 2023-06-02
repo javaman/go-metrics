@@ -22,7 +22,7 @@ func (d *defaultDatabase) Ping() error {
 		return err
 	}
 	if i != 42 {
-		return errors.New("Wrong value pingig database")
+		return errors.New("wrong value pingig database")
 	}
 	return nil
 }

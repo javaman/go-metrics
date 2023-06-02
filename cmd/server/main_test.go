@@ -23,7 +23,7 @@ func TestOne(t *testing.T) {
 	storage := repository.NewInMemoryStorage()
 	storage.SaveGauge("g1", 3.14)
 	storage.SaveCounter("counter1", 42)
-	service := services.NewMetricsService(storage, &mockDb{})
+	service := services.NewMetricsService(storage, &mockDB{})
 	testData := []struct {
 		path           string
 		method         string
