@@ -11,7 +11,7 @@ type ServerConfiguration struct {
 	StoreInterval   int    `env:"STORE_INTERVAL"`
 	FileStoragePath string `env:"FILE_STORAGE_PATH"`
 	Restore         bool   `env:"RESTORE"`
-	DBDsn           string `env:"DATABASE_DSNX"`
+	DBDsn           string `env:"DATABASE_DSN"`
 }
 
 type AgentConfiguration struct {
