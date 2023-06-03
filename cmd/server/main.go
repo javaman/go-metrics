@@ -9,10 +9,13 @@ import (
 	"github.com/javaman/go-metrics/internal/services"
 )
 
-func main() {
+func configureWithDatabase(cfg *config.ServerConfiguration) services.MetricsService {
+	database := db.New(cfg.DBDsn)
+	storage := repository.NewDatabaseStorage(database)
+	return services.NewMetricsService(storage, database)
+}
 
-	cfg := config.ConfigureServer()
-
+func configureInMemtory(cfg *config.ServerConfiguration) services.MetricsService {
 	var storage repository.Storage
 
 	if cfg.Restore {
@@ -27,7 +30,19 @@ func main() {
 		storage = repository.MakeStorageFlushedOnEachCall(storage, cfg.FileStoragePath)
 	}
 
-	service := services.NewMetricsService(storage, db.New(cfg.DBDsn))
+	return services.NewMetricsService(storage, db.NewStub())
+}
+
+func main() {
+
+	cfg := config.ConfigureServer()
+	var service services.MetricsService
+
+	if cfg.DBDsn != "" {
+		service = configureWithDatabase(cfg)
+	} else {
+		service = configureInMemtory(cfg)
+	}
 
 	e := handlers.New(service)
 
