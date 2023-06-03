@@ -8,7 +8,7 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
-var ErrNotFound error = errors.New("Not found")
+var ErrNotFound error = errors.New("not found")
 
 type Database interface {
 	Ping() error
