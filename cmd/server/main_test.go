@@ -5,6 +5,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/javaman/go-metrics/internal/db"
 	"github.com/javaman/go-metrics/internal/handlers"
 	"github.com/javaman/go-metrics/internal/repository"
 	"github.com/javaman/go-metrics/internal/services"
@@ -16,7 +17,7 @@ func TestOne(t *testing.T) {
 	storage := repository.NewInMemoryStorage()
 	storage.SaveGauge("g1", 3.14)
 	storage.SaveCounter("counter1", 42)
-	service := services.NewMetricsService(storage)
+	service := services.NewMetricsService(storage, db.NewStub())
 	testData := []struct {
 		path           string
 		method         string

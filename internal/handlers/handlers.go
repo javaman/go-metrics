@@ -131,6 +131,15 @@ func Value(s services.MetricsService) func(echo.Context) error {
 	}
 }
 
+func Ping(s services.MetricsService) func(echo.Context) error {
+	return func(c echo.Context) error {
+		if err := s.Ping(); err == nil {
+			return c.NoContent(http.StatusOK)
+		}
+		return c.NoContent(http.StatusInternalServerError)
+	}
+}
+
 func New(service services.MetricsService) *echo.Echo {
 	e := echo.New()
 
@@ -148,6 +157,8 @@ func New(service services.MetricsService) *echo.Echo {
 	e.POST("/update/gauge/:measureName/:measureValue", UpdateGauge(service))
 	e.POST("/update/gauge/", NotFound)
 	e.POST("/update/", Update(service))
+
+	e.GET("/ping", Ping(service))
 
 	logger, _ := zap.NewProduction()
 	defer logger.Sync()
