@@ -8,7 +8,7 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
-var NotFound error = errors.New("Not found")
+var ErrNotFound error = errors.New("Not found")
 
 type Database interface {
 	Ping() error
@@ -39,7 +39,7 @@ func (d *defaultDatabase) Select(id string, mtype string) (int64, float64, error
 	var value float64
 	if err := d.db.QueryRow("SELECT delta, value FROM metrics WHERE id = $1 and mtype = $2", id, mtype).Scan(&delta, &value); err != nil {
 		if err == sql.ErrNoRows {
-			return 0, 0, NotFound
+			return 0, 0, ErrNotFound
 		}
 		return 0, 0, err
 	}
@@ -49,10 +49,12 @@ func (d *defaultDatabase) Select(id string, mtype string) (int64, float64, error
 func (d *defaultDatabase) SelectAll(mtype string, f func(string, int64, float64)) error {
 	rows, err := d.db.Query("SELECT id, delta, value FROM metrics WHERE mtype=$1 ORDER BY ID", mtype)
 	if err != nil {
-		fmt.Println(err)
 		return err
 	}
-	defer rows.Close()
+	defer func() {
+		_ = rows.Close()
+		_ = rows.Err()
+	}()
 
 	var id string
 	var delta int64
