@@ -11,6 +11,7 @@ import (
 
 func configureWithDatabase(cfg *config.ServerConfiguration) services.MetricsService {
 	database := db.New(cfg.DBDsn)
+	database.CreateTable()
 	storage := repository.NewDatabaseStorage(database)
 	return services.NewMetricsService(storage, database)
 }
