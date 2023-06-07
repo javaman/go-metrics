@@ -208,7 +208,7 @@ func main() {
 	measuresBuffer := &measuresBuffer{}
 	measuresServer := &batchedMeasuresServer{
 		resty.New(),
-		make([]model.Metrics, 1, 1),
+		make([]model.Metrics, 1),
 	}
 	measuresServer.SetBaseURL("http://" + conf.Address + "/updates")
 
