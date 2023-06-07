@@ -3,17 +3,14 @@ package main
 import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/javaman/go-metrics/internal/config"
-	"github.com/javaman/go-metrics/internal/db"
 	"github.com/javaman/go-metrics/internal/handlers"
 	"github.com/javaman/go-metrics/internal/repository"
 	"github.com/javaman/go-metrics/internal/services"
 )
 
 func configureWithDatabase(cfg *config.ServerConfiguration) services.MetricsService {
-	database := db.New(cfg.DBDsn)
-	database.CreateTable()
-	storage := repository.NewDatabaseStorage(database)
-	return services.NewMetricsService(storage, database)
+	storage, ping := repository.NewDatabaseStorage(cfg.DBDsn)
+	return services.NewMetricsService(storage, ping)
 }
 
 func configureInMemtory(cfg *config.ServerConfiguration) services.MetricsService {
@@ -31,7 +28,7 @@ func configureInMemtory(cfg *config.ServerConfiguration) services.MetricsService
 		storage = repository.MakeStorageFlushedOnEachCall(storage, cfg.FileStoragePath)
 	}
 
-	return services.NewMetricsService(storage, db.NewStub())
+	return services.NewMetricsService(storage, func() error { return nil })
 }
 
 func main() {

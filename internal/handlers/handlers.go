@@ -140,6 +140,20 @@ func Ping(s services.MetricsService) func(echo.Context) error {
 	}
 }
 
+func Updates(s services.MetricsService) func(echo.Context) error {
+	return func(c echo.Context) error {
+		var metrics []model.Metrics
+		err := json.NewDecoder(c.Request().Body).Decode(&metrics)
+		if err != nil {
+			return c.String(http.StatusBadRequest, err.Error())
+		}
+		fmt.Println("======")
+		fmt.Println(len(metrics))
+		s.Updates(metrics)
+		return c.NoContent(http.StatusOK)
+	}
+}
+
 func New(service services.MetricsService) *echo.Echo {
 	e := echo.New()
 
@@ -159,6 +173,8 @@ func New(service services.MetricsService) *echo.Echo {
 	e.POST("/update/", Update(service))
 
 	e.GET("/ping", Ping(service))
+
+	e.POST("/updates/", Updates(service))
 
 	logger, _ := zap.NewProduction()
 	defer logger.Sync()
