@@ -75,7 +75,7 @@ func (dm *defaultMetricsService) saveCounterStruct(m *model.Metrics) (*model.Met
 	return result, nil
 }
 
-func (dm *defaultMetricsService) saveGaugeStruct(m *model.Metrics) (*model.Metrics, error) {
+func (dm *defaultMetricsService) saveGauge(m *model.Metrics) (*model.Metrics, error) {
 	result := &model.Metrics{ID: m.ID, MType: m.MType}
 	if strings.TrimSpace(m.ID) == "" {
 		return nil, ErrIDRequired
@@ -94,7 +94,7 @@ func (dm *defaultMetricsService) Save(m *model.Metrics) (*model.Metrics, error) 
 	case "counter":
 		return dm.saveCounterStruct(m)
 	case "gauge":
-		return dm.saveGaugeStruct(m)
+		return dm.saveGauge(m)
 	default:
 		return nil, ErrInvalidMType
 	}

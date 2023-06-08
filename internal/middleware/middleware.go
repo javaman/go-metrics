@@ -7,6 +7,8 @@ import (
 	"strings"
 
 	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v4/middleware"
+	"go.uber.org/zap"
 )
 
 const (
@@ -90,6 +92,7 @@ func (c *compressWriter) WriteHeader(statusCode int) {
 func (c *compressWriter) Close() error {
 	return c.zw.Close()
 }
+
 func Compress(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		if strings.Contains(c.Request().Header.Get("Accept-Encoding"), contentEncodingGzip) {
@@ -110,4 +113,29 @@ func Compress(next echo.HandlerFunc) echo.HandlerFunc {
 		}
 		return next(c)
 	}
+}
+
+func Logger() echo.MiddlewareFunc {
+	logger, _ := zap.NewProduction()
+	defer logger.Sync()
+	sugar := logger.Sugar()
+	return middleware.RequestLoggerWithConfig(middleware.RequestLoggerConfig{
+		LogURI:          true,
+		LogMethod:       true,
+		LogLatency:      true,
+		LogStatus:       true,
+		LogResponseSize: true,
+		LogValuesFunc: func(e echo.Context, v middleware.RequestLoggerValues) error {
+			sugar.Infow("request",
+				zap.String("URI", v.URI),
+				zap.String("method", v.Method),
+				zap.Int64("latency", v.Latency.Nanoseconds()),
+			)
+			sugar.Infow("response",
+				zap.Int("status", v.Status),
+				zap.Int64("size", v.ResponseSize),
+			)
+			return nil
+		},
+	})
 }

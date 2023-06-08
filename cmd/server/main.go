@@ -32,8 +32,6 @@ func configureInMemtory(cfg *config.ServerConfiguration) services.MetricsService
 }
 
 func main() {
-	//
-
 	cfg := config.ConfigureServer()
 	var service services.MetricsService
 
