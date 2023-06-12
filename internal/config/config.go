@@ -27,8 +27,7 @@ func ConfigureServer() *ServerConfiguration {
 	flag.IntVar(&conf.StoreInterval, "i", 300, "Интервал сохранения на диск. 0 - синхронно")
 	flag.StringVar(&conf.FileStoragePath, "f", "/tmp/metrics-db.json", "Файл, где сохраняются метрики")
 	flag.BoolVar(&conf.Restore, "r", false, "Загрузить ли ранее сохраненные значения")
-	flag.StringVar(&conf.DBDsn, "d", "user=postgres password=iddqd123 host=localhost database=postgres sslmode=disable", "Подключение к БД")
-	//flag.StringVar(&conf.DBDsn, "d", "", "Подключение к БД")
+	flag.StringVar(&conf.DBDsn, "d", "", "Подключение к БД")
 	flag.Parse()
 
 	env.Parse(conf)
