@@ -115,6 +115,10 @@ func Compress(next echo.HandlerFunc) echo.HandlerFunc {
 	}
 }
 
+func CompressDecompress(next echo.HandlerFunc) echo.HandlerFunc {
+	return Decompress(Compress(next))
+}
+
 func Logger() echo.MiddlewareFunc {
 	logger, _ := zap.NewProduction()
 	defer logger.Sync()

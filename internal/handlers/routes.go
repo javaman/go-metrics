@@ -8,7 +8,7 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-func New(service services.MetricsService) *echo.Echo {
+func New(service services.MetricsService, ping func() error) *echo.Echo {
 	e := echo.New()
 
 	e.GET("/", ListAll(service))
@@ -26,12 +26,11 @@ func New(service services.MetricsService) *echo.Echo {
 	e.POST("/update/gauge/", NotFound)
 	e.POST("/update/", Update(service))
 
-	e.GET("/ping", Ping(service))
+	e.GET("/ping", Ping(ping))
 
 	e.POST("/updates/", Updates(service))
 
 	e.Use(mymiddleware.Logger())
-	e.Use(mymiddleware.Compress)
-	e.Use(mymiddleware.Decompress)
+	e.Use(mymiddleware.CompressDecompress)
 	return e
 }

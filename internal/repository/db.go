@@ -4,32 +4,29 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
+	"net"
+	"time"
+
+	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/javaman/go-metrics/internal/model"
 )
 
-var ErrNotFound error = errors.New("not found")
+type databaseStorage struct {
+	db *sql.DB
+	tx *sql.Tx
+}
 
-func upsert(tx *sql.Tx, id string, mtype string, delta int64, value float64) error {
-	_, err := tx.Exec(`
-		INSERT INTO metrics(id, mtype, delta, value) VALUES($1, $2, $3, $4) 
-		ON CONFLICT ON CONSTRAINT metrics_pk DO UPDATE SET delta = EXCLUDED.delta, value = EXCLUDED.value
-	`, id, mtype, delta, value)
+/*
+ *  утильные функции выполнить запрос вернуть ошибки, закрыть ресуры
+ */
+func update(exec func(string, ...any) (sql.Result, error), queryString string, args ...any) error {
+	_, err := exec(queryString, args...)
 	return err
 }
 
-func query(tx *sql.Tx, id string, mtype string) (int64, float64, error) {
-	var delta int64
-	var value float64
-	if err := tx.QueryRow("SELECT delta, value FROM metrics WHERE id = $1 and mtype = $2", id, mtype).Scan(&delta, &value); err != nil {
-		if err == sql.ErrNoRows {
-			return 0, 0, ErrNotFound
-		}
-		return 0, 0, err
-	}
-	return delta, value, nil
-}
-
-func queryAll(tx *sql.Tx, mtype string, f func(string, int64, float64)) error {
-	rows, err := tx.Query("SELECT id, delta, value FROM metrics WHERE mtype=$1 ORDER BY ID", mtype)
+func query(queryFunc func(string, ...any) (*sql.Rows, error), queryString string, consumer func(string, string, int64, float64) bool, args ...any) error {
+	rows, err := queryFunc(queryString, args...)
 	if err != nil {
 		return err
 	}
@@ -39,21 +36,40 @@ func queryAll(tx *sql.Tx, mtype string, f func(string, int64, float64)) error {
 	}()
 
 	var id string
+	var mtype string
 	var delta int64
 	var value float64
 
 	for rows.Next() {
-		if err := rows.Scan(&id, &delta, &value); err != nil {
+		if err := rows.Scan(&id, &mtype, &delta, &value); err != nil {
 			return err
 		}
-		f(id, delta, value)
+		if !consumer(id, mtype, delta, value) {
+			break
+		}
 	}
 
 	return nil
 }
 
-func createTable(db *sql.DB) {
-	db.Exec(`
+func retry(f func() error) error {
+	sleep := [...]int{1, 3, 5}
+	var err error
+	for _, s := range sleep {
+		err = f()
+		var netError net.Error
+		if err == nil || !errors.As(err, &netError) || pgconn.SafeToRetry(err) {
+			break
+		}
+		fmt.Println(err)
+		time.Sleep(time.Duration(s) * time.Second)
+	}
+	return err
+}
+
+func createTable(db *sql.DB) error {
+	return retry(func() error {
+		_, err := db.Exec(`
 		CREATE TABLE IF NOT EXISTS metrics (
 			id text,
 			mtype text,
@@ -61,97 +77,134 @@ func createTable(db *sql.DB) {
 			value double precision,
 			CONSTRAINT metrics_pk PRIMARY KEY(id, mtype)
 		)
-	`)
+	        `)
+		return err
+	})
 }
 
-type databaseStorage struct {
-	db *sql.DB
-	tx *sql.Tx
-}
-
-func (d *databaseStorage) useTransactionOrNew() (*sql.Tx, bool) {
-	if d.tx == nil {
-		result, _ := d.db.BeginTx(context.TODO(), &sql.TxOptions{Isolation: sql.LevelSerializable})
-		return result, true
+/*
+ * некий промежуточный слой - связать все вместе - контекст транзакционный или нет, переповтор, сам запрос, параметры, куда будут результаты возвращены
+ */
+func (d *databaseStorage) get(id string, mtype string) (int64, float64, bool, error) {
+	queryFunc := d.db.Query
+	if d.tx != nil {
+		queryFunc = d.tx.Query
 	}
-	return d.tx, false
+	found := false
+	var delta int64
+	var value float64
+
+	err := retry(func() error {
+		return query(queryFunc, "SELECT id, mtype, delta, value FROM metrics WHERE id=$1 and mtype=$2", func(i string, m string, d int64, v float64) bool {
+			found = true
+			delta = d
+			value = v
+			return false
+
+		}, id, mtype)
+	})
+	if err == nil {
+		return delta, value, found, nil
+	}
+	return 0, 0, false, err
 }
 
+func (d *databaseStorage) getAll(mtype string, consumer func(string, int64, float64) bool) error {
+	queryFunc := d.db.Query
+	if d.tx != nil {
+		queryFunc = d.tx.Query
+	}
+	return retry(func() error {
+		return query(queryFunc, "SELECT id, mtype, delta, value FROM metrics WHERE mtype=$1", func(i string, m string, d int64, v float64) bool {
+			consumer(i, d, v)
+			return true
+		}, mtype)
+	})
+}
+
+func (d *databaseStorage) save(id string, mtype string, delta int64, value float64) error {
+	queryFunc := d.db.Exec
+	if d.tx != nil {
+		queryFunc = d.tx.Exec
+	}
+	err := retry(func() error {
+		return update(queryFunc, `
+			insert into metrics(id, mtype, delta, value) values($1, $2, $3, $4) 
+			on conflict on constraint metrics_pk do update set delta = excluded.delta, value = excluded.value
+		`, id, mtype, delta, value)
+	})
+	return err
+}
+
+/*
+ *  сама реализация интерфейса
+ */
 func (d *databaseStorage) SaveGauge(name string, v float64) {
-	tx, created := d.useTransactionOrNew()
-	if created {
-		defer tx.Commit()
-	}
-	upsert(tx, name, "gauge", 0, v)
+	d.save(name, model.Gauge, 0, v)
 }
 
 func (d *databaseStorage) GetGauge(name string) (float64, bool) {
-	tx, created := d.useTransactionOrNew()
-	if created {
-		defer tx.Commit()
+	_, value, found, err := d.get(name, model.Gauge)
+	if err != nil {
+		return 0, false
 	}
-	_, value, err := query(tx, name, "gauge")
-	if err == nil {
-		return value, true
-	}
-	return 0, false
+	return value, found
 }
 
 func (d *databaseStorage) AllGauges(f func(string, float64)) {
-	tx, created := d.useTransactionOrNew()
-	if created {
-		defer tx.Commit()
-	}
-	queryAll(tx, "gauge", func(id string, delta int64, value float64) {
+	d.getAll(model.Gauge, func(id string, delta int64, value float64) bool {
 		f(id, value)
+		return true
 	})
 }
 
 func (d *databaseStorage) SaveCounter(name string, v int64) {
-	tx, created := d.useTransactionOrNew()
-	if created {
-		defer tx.Commit()
-	}
-	upsert(tx, name, "counter", v, 0)
+	d.save(name, model.Counter, v, 0)
 }
 
 func (d *databaseStorage) GetCounter(name string) (int64, bool) {
-	tx, created := d.useTransactionOrNew()
-	if created {
-		defer tx.Commit()
+	delta, _, found, err := d.get(name, model.Counter)
+	if err != nil {
+		return 0, false
 	}
-	delta, _, err := query(tx, name, "counter")
-	if err == nil {
-		return delta, true
-	}
-	return 0, false
+	return delta, found
 }
 
 func (d *databaseStorage) AllCounters(f func(string, int64)) {
-	tx, created := d.useTransactionOrNew()
-	if created {
-		defer tx.Commit()
-	}
-	queryAll(tx, "counter", func(id string, delta int64, value float64) {
+	d.getAll(model.Counter, func(id string, delta int64, value float64) bool {
 		f(id, delta)
+		return true
 	})
 }
 
-func (d *databaseStorage) Lock() LockedStorage {
-	tx, _ := d.db.BeginTx(context.TODO(), &sql.TxOptions{Isolation: sql.LevelSerializable})
-	return &databaseStorage{d.db, tx}
+func (d *databaseStorage) Lock() (LockedStorage, error) {
+	var tx *sql.Tx
+	err := retry(func() error {
+		var err error
+		tx, err = d.db.BeginTx(context.TODO(), &sql.TxOptions{Isolation: sql.LevelSerializable})
+		return err
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &databaseStorage{d.db, tx}, nil
 }
 
-func (d *databaseStorage) Unlock() {
-	d.tx.Commit()
+func (d *databaseStorage) Unlock() error {
+	return d.tx.Commit()
 }
 
 func (d *databaseStorage) WriteToFile(file string) {
 	//Ok to do nothing
 }
 
-func NewDatabaseStorage(constr string) (*databaseStorage, func() error) {
-	db, _ := sql.Open("pgx", constr)
+func NewDatabaseStorage(db *sql.DB) *databaseStorage {
 	createTable(db)
-	return &databaseStorage{db: db}, func() error { return db.Ping() }
+	return &databaseStorage{db: db}
+}
+
+func PingDB(db *sql.DB) func() error {
+	return func() error {
+		return db.Ping()
+	}
 }

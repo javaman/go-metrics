@@ -14,12 +14,12 @@ type Storage interface {
 	GetCounter(name string) (int64, bool)
 	AllCounters(func(string, int64))
 	WriteToFile(file string)
-	Lock() LockedStorage
+	Lock() (LockedStorage, error)
 }
 
 type LockedStorage interface {
 	Storage
-	Unlock()
+	Unlock() error
 }
 
 func MakeStorageFlushedOnEachCall(s Storage, fname string) Storage {
@@ -89,12 +89,13 @@ func (m *memStorage) AllCounters(f func(string, int64)) {
 	}
 }
 
-func (m *memStorage) Lock() LockedStorage {
-	return m
+func (m *memStorage) Lock() (LockedStorage, error) {
+	return m, nil
 }
 
-func (m *memStorage) Unlock() {
+func (m *memStorage) Unlock() error {
 	// Do nothing
+	return nil
 }
 
 type wrappingSaveToFile struct {

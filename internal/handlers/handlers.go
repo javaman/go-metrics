@@ -128,15 +128,6 @@ func Value(s services.MetricsService) func(echo.Context) error {
 	}
 }
 
-func Ping(s services.MetricsService) func(echo.Context) error {
-	return func(c echo.Context) error {
-		if err := s.Ping(); err == nil {
-			return c.NoContent(http.StatusOK)
-		}
-		return c.NoContent(http.StatusInternalServerError)
-	}
-}
-
 func Updates(s services.MetricsService) func(echo.Context) error {
 	return func(c echo.Context) error {
 		var metrics []model.Metrics
@@ -144,9 +135,16 @@ func Updates(s services.MetricsService) func(echo.Context) error {
 		if err != nil {
 			return c.String(http.StatusBadRequest, err.Error())
 		}
-		fmt.Println("======")
-		fmt.Println(len(metrics))
 		s.Updates(metrics)
 		return c.NoContent(http.StatusOK)
+	}
+}
+
+func Ping(ping func() error) func(echo.Context) error {
+	return func(c echo.Context) error {
+		if err := ping(); err == nil {
+			return c.NoContent(http.StatusOK)
+		}
+		return c.NoContent(http.StatusInternalServerError)
 	}
 }
