@@ -2,7 +2,9 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"math/rand"
+	"net"
 	"runtime"
 	"time"
 
@@ -149,11 +151,22 @@ func (s *batchedMeasuresServer) saveGauge(m Measure, v float64) {
 }
 
 func (s *batchedMeasuresServer) finishBatch() {
+	delays := [...]int{1, 3, 5}
 	encoded, _ := json.Marshal(s.measures)
-	s.R().
-		SetHeader("Content-Type", "application/json").
-		SetBody(string(encoded[:])).
-		Post("/")
+	for _, delay := range delays {
+		_, err := s.R().
+			SetHeader("Content-Type", "application/json").
+			SetBody(string(encoded[:])).
+			Post("/")
+		if err == nil {
+			break
+		}
+		var opError *net.OpError
+		if !errors.As(err, &opError) {
+			break
+		}
+		time.Sleep(time.Duration(delay) * time.Second)
+	}
 }
 
 func gcd(a, b int) int {
