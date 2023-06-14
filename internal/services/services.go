@@ -5,7 +5,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-playground/validator/v10"
 	"github.com/javaman/go-metrics/internal/model"
 	"github.com/javaman/go-metrics/internal/repository"
 )
@@ -27,11 +26,15 @@ type MetricsService interface {
 	AllCounters(func(string, int64))
 	Save(m *model.Metrics) (*model.Metrics, error)
 	Value(m *model.Metrics) (*model.Metrics, error)
+	Updates(metrics []model.Metrics)
 }
 
 type defaultMetricsService struct {
-	storage   repository.Storage
-	validator *validator.Validate
+	storage repository.Storage
+}
+
+func NewMetricsService(repository repository.Storage) *defaultMetricsService {
+	return &defaultMetricsService{repository}
 }
 
 func (dm *defaultMetricsService) SaveGauge(name string, v float64) {
@@ -74,7 +77,7 @@ func (dm *defaultMetricsService) saveCounterStruct(m *model.Metrics) (*model.Met
 	return result, nil
 }
 
-func (dm *defaultMetricsService) saveGaugeStruct(m *model.Metrics) (*model.Metrics, error) {
+func (dm *defaultMetricsService) saveGauge(m *model.Metrics) (*model.Metrics, error) {
 	result := &model.Metrics{ID: m.ID, MType: m.MType}
 	if strings.TrimSpace(m.ID) == "" {
 		return nil, ErrIDRequired
@@ -89,11 +92,11 @@ func (dm *defaultMetricsService) saveGaugeStruct(m *model.Metrics) (*model.Metri
 }
 
 func (dm *defaultMetricsService) Save(m *model.Metrics) (*model.Metrics, error) {
-	switch metricType := m.MType; metricType {
-	case "counter":
+	switch {
+	case m.IsDeltaCounter():
 		return dm.saveCounterStruct(m)
-	case "gauge":
-		return dm.saveGaugeStruct(m)
+	case m.IsValueGauge():
+		return dm.saveGauge(m)
 	default:
 		return nil, ErrInvalidMType
 	}
@@ -117,18 +120,28 @@ func (dm *defaultMetricsService) valueGaugeStruct(m *model.Metrics) (*model.Metr
 
 func (dm *defaultMetricsService) Value(m *model.Metrics) (*model.Metrics, error) {
 	result := &model.Metrics{ID: m.ID, MType: m.MType}
-	switch m.MType {
-	case "counter":
+	switch {
+	case m.IsDeltaCounter():
 		return dm.valueCounterStruct(result)
-	case "gauge":
+	case m.IsValueGauge():
 		return dm.valueGaugeStruct(result)
 	default:
 		return nil, ErrInvalidMType
 	}
 }
 
-func NewMetricsService(repository repository.Storage) *defaultMetricsService {
-	return &defaultMetricsService{repository, validator.New()}
+func (dm *defaultMetricsService) Updates(metrics []model.Metrics) {
+	lockedStorage, _ := dm.storage.Lock()
+	defer lockedStorage.Unlock()
+	for _, m := range metrics {
+		switch {
+		case m.IsDeltaCounter() && len(m.ID) > 0 && m.Delta != nil:
+			delta, _ := lockedStorage.GetCounter(m.ID)
+			lockedStorage.SaveCounter(m.ID, delta+*m.Delta)
+		case m.IsValueGauge() && len(m.ID) > 0 && m.Value != nil:
+			lockedStorage.SaveGauge(m.ID, *m.Value)
+		}
+	}
 }
 
 func FlushStorageInBackground(storage repository.Storage, fname string, interval int) {

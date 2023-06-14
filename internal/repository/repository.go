@@ -1,12 +1,15 @@
 package repository
 
 import (
+	"context"
+	"database/sql/driver"
 	"encoding/json"
 	"fmt"
 	"os"
 )
 
 type Storage interface {
+	driver.Pinger
 	SaveGauge(name string, v float64)
 	GetGauge(name string) (float64, bool)
 	AllGauges(func(string, float64))
@@ -14,6 +17,12 @@ type Storage interface {
 	GetCounter(name string) (int64, bool)
 	AllCounters(func(string, int64))
 	WriteToFile(file string)
+	Lock() (LockedStorage, error)
+}
+
+type LockedStorage interface {
+	Storage
+	Unlock() error
 }
 
 func MakeStorageFlushedOnEachCall(s Storage, fname string) Storage {
@@ -81,6 +90,19 @@ func (m *memStorage) AllCounters(f func(string, int64)) {
 	for k, v := range m.counters {
 		f(k, v)
 	}
+}
+
+func (m *memStorage) Ping(ctx context.Context) error {
+	return nil
+}
+
+func (m *memStorage) Lock() (LockedStorage, error) {
+	return m, nil
+}
+
+func (m *memStorage) Unlock() error {
+	// Do nothing
+	return nil
 }
 
 type wrappingSaveToFile struct {

@@ -2,7 +2,9 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"math/rand"
+	"net"
 	"runtime"
 	"time"
 
@@ -14,6 +16,7 @@ import (
 type MeasureDestination interface {
 	saveCounter(m Measure, value int64)
 	saveGauge(m Measure, value float64)
+	finishBatch()
 }
 
 type Measure interface {
@@ -61,6 +64,9 @@ func (mb *measuresBuffer) saveCounter(m Measure, value int64) {
 
 func (mb *measuresBuffer) saveGauge(m Measure, value float64) {
 	mb.buffer = append(mb.buffer, m)
+}
+
+func (mb *measuresBuffer) finishBatch() {
 }
 
 type defaultMeasured struct {
@@ -128,6 +134,41 @@ func (s *measuresServer) saveGauge(m Measure, v float64) {
 		Post("/")
 }
 
+func (s *measuresServer) finishBatch() {
+}
+
+type batchedMeasuresServer struct {
+	*resty.Client
+	measures []model.Metrics
+}
+
+func (s *batchedMeasuresServer) saveCounter(m Measure, v int64) {
+	s.measures = append(s.measures, model.Metrics{ID: m.name(), MType: "counter", Delta: &v})
+}
+
+func (s *batchedMeasuresServer) saveGauge(m Measure, v float64) {
+	s.measures = append(s.measures, model.Metrics{ID: m.name(), MType: "gauge", Value: &v})
+}
+
+func (s *batchedMeasuresServer) finishBatch() {
+	delays := [...]int{1, 3, 5}
+	encoded, _ := json.Marshal(s.measures)
+	for _, delay := range delays {
+		_, err := s.R().
+			SetHeader("Content-Type", "application/json").
+			SetBody(string(encoded[:])).
+			Post("/")
+		if err == nil {
+			break
+		}
+		var opError *net.OpError
+		if !errors.As(err, &opError) {
+			break
+		}
+		time.Sleep(time.Duration(delay) * time.Second)
+	}
+}
+
 func gcd(a, b int) int {
 	for b != 0 {
 		a, b = b, a%b
@@ -140,6 +181,7 @@ func send(measures []Measure, destination MeasureDestination) {
 	for _, m := range measures {
 		m.save(destination)
 	}
+	destination.finishBatch()
 }
 
 type Worker interface {
@@ -177,10 +219,11 @@ func main() {
 
 	defaultMeasured := &defaultMeasured{}
 	measuresBuffer := &measuresBuffer{}
-	measuresServer := &measuresServer{
+	measuresServer := &batchedMeasuresServer{
 		resty.New(),
+		make([]model.Metrics, 1),
 	}
-	measuresServer.SetBaseURL("http://" + conf.Address + "/update")
+	measuresServer.SetBaseURL("http://" + conf.Address + "/updates")
 
 	dw := &defaultWorker{
 		conf.PollInterval,

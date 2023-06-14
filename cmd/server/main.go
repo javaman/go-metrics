@@ -1,15 +1,23 @@
 package main
 
 import (
+	"database/sql"
+	"database/sql/driver"
+
+	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/javaman/go-metrics/internal/config"
 	"github.com/javaman/go-metrics/internal/handlers"
 	"github.com/javaman/go-metrics/internal/repository"
 	"github.com/javaman/go-metrics/internal/services"
 )
 
-func main() {
-	cfg := config.ConfigureServer()
+func configureWithDatabase(cfg *config.ServerConfiguration) (services.MetricsService, driver.Pinger) {
+	db, _ := sql.Open("pgx", cfg.DBDsn)
+	storage := repository.NewDatabaseStorage(db)
+	return services.NewMetricsService(storage), storage
+}
 
+func configureInMemtory(cfg *config.ServerConfiguration) (services.MetricsService, driver.Pinger) {
 	var storage repository.Storage
 
 	if cfg.Restore {
@@ -24,9 +32,21 @@ func main() {
 		storage = repository.MakeStorageFlushedOnEachCall(storage, cfg.FileStoragePath)
 	}
 
-	service := services.NewMetricsService(storage)
+	return services.NewMetricsService(storage), storage
+}
 
-	e := handlers.New(service)
+func main() {
+	cfg := config.ConfigureServer()
+	var service services.MetricsService
+	var ping driver.Pinger
+
+	if cfg.DBDsn != "" {
+		service, ping = configureWithDatabase(cfg)
+	} else {
+		service, ping = configureInMemtory(cfg)
+	}
+
+	e := handlers.New(service, ping)
 
 	e.Logger.Fatal(e.Start(cfg.Address))
 }
