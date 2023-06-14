@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"testing"
 
 	"github.com/javaman/go-metrics/internal/repository"
@@ -45,6 +46,11 @@ func (m *mockStorage) WriteToFile(fname string) {
 func (m *mockStorage) Lock() (repository.LockedStorage, error) {
 	m.Called()
 	return nil, nil
+}
+
+func (m *mockStorage) Ping(ctx context.Context) error {
+	m.Called(ctx)
+	return nil
 }
 
 func TestSaveGauge(t *testing.T) {

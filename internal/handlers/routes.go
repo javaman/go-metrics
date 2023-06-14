@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"database/sql/driver"
 	"net/http"
 
 	mymiddleware "github.com/javaman/go-metrics/internal/middleware"
@@ -8,7 +9,7 @@ import (
 	"github.com/labstack/echo/v4"
 )
 
-func New(service services.MetricsService, ping func() error) *echo.Echo {
+func New(service services.MetricsService, pinger driver.Pinger) *echo.Echo {
 	e := echo.New()
 
 	e.GET("/", ListAll(service))
@@ -26,7 +27,7 @@ func New(service services.MetricsService, ping func() error) *echo.Echo {
 	e.POST("/update/gauge/", NotFound)
 	e.POST("/update/", Update(service))
 
-	e.GET("/ping", Ping(ping))
+	e.GET("/ping", Ping(pinger))
 
 	e.POST("/updates/", Updates(service))
 

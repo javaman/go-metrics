@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"context"
+	"database/sql/driver"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -140,9 +142,9 @@ func Updates(s services.MetricsService) func(echo.Context) error {
 	}
 }
 
-func Ping(ping func() error) func(echo.Context) error {
+func Ping(pinger driver.Pinger) func(echo.Context) error {
 	return func(c echo.Context) error {
-		if err := ping(); err == nil {
+		if err := pinger.Ping(context.TODO()); err == nil {
 			return c.NoContent(http.StatusOK)
 		}
 		return c.NoContent(http.StatusInternalServerError)
