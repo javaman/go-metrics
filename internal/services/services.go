@@ -5,7 +5,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-playground/validator/v10"
 	"github.com/javaman/go-metrics/internal/model"
 	"github.com/javaman/go-metrics/internal/repository"
 )
@@ -27,11 +26,13 @@ type MetricsService interface {
 	AllCounters(func(string, int64))
 	Save(m *model.Metrics) (*model.Metrics, error)
 	Value(m *model.Metrics) (*model.Metrics, error)
+	Ping() error
+	Updates(metrics []model.Metrics)
 }
 
 type defaultMetricsService struct {
-	storage   repository.Storage
-	validator *validator.Validate
+	storage repository.Storage
+	ping    func() error
 }
 
 func (dm *defaultMetricsService) SaveGauge(name string, v float64) {
@@ -127,8 +128,26 @@ func (dm *defaultMetricsService) Value(m *model.Metrics) (*model.Metrics, error)
 	}
 }
 
-func NewMetricsService(repository repository.Storage) *defaultMetricsService {
-	return &defaultMetricsService{repository, validator.New()}
+func (dm *defaultMetricsService) Ping() error {
+	return dm.ping()
+}
+
+func (dm *defaultMetricsService) Updates(metrics []model.Metrics) {
+	lockedStorage := dm.storage.Lock()
+	defer lockedStorage.Unlock()
+	for _, m := range metrics {
+		switch {
+		case m.MType == "counter" && len(m.ID) > 0 && m.Delta != nil:
+			delta, _ := lockedStorage.GetCounter(m.ID)
+			lockedStorage.SaveCounter(m.ID, delta+*m.Delta)
+		case m.MType == "gauge" && len(m.ID) > 0 && m.Value != nil:
+			lockedStorage.SaveGauge(m.ID, *m.Value)
+		}
+	}
+}
+
+func NewMetricsService(repository repository.Storage, ping func() error) *defaultMetricsService {
+	return &defaultMetricsService{repository, ping}
 }
 
 func FlushStorageInBackground(storage repository.Storage, fname string, interval int) {

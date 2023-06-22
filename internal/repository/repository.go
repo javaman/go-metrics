@@ -14,6 +14,12 @@ type Storage interface {
 	GetCounter(name string) (int64, bool)
 	AllCounters(func(string, int64))
 	WriteToFile(file string)
+	Lock() LockedStorage
+}
+
+type LockedStorage interface {
+	Storage
+	Unlock()
 }
 
 func MakeStorageFlushedOnEachCall(s Storage, fname string) Storage {
@@ -81,6 +87,14 @@ func (m *memStorage) AllCounters(f func(string, int64)) {
 	for k, v := range m.counters {
 		f(k, v)
 	}
+}
+
+func (m *memStorage) Lock() LockedStorage {
+	return m
+}
+
+func (m *memStorage) Unlock() {
+	// Do nothing
 }
 
 type wrappingSaveToFile struct {

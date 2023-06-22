@@ -1,15 +1,19 @@
 package main
 
 import (
+	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/javaman/go-metrics/internal/config"
 	"github.com/javaman/go-metrics/internal/handlers"
 	"github.com/javaman/go-metrics/internal/repository"
 	"github.com/javaman/go-metrics/internal/services"
 )
 
-func main() {
-	cfg := config.ConfigureServer()
+func configureWithDatabase(cfg *config.ServerConfiguration) services.MetricsService {
+	storage, ping := repository.NewDatabaseStorage(cfg.DBDsn)
+	return services.NewMetricsService(storage, ping)
+}
 
+func configureInMemtory(cfg *config.ServerConfiguration) services.MetricsService {
 	var storage repository.Storage
 
 	if cfg.Restore {
@@ -24,7 +28,20 @@ func main() {
 		storage = repository.MakeStorageFlushedOnEachCall(storage, cfg.FileStoragePath)
 	}
 
-	service := services.NewMetricsService(storage)
+	return services.NewMetricsService(storage, func() error { return nil })
+}
+
+func main() {
+	//
+
+	cfg := config.ConfigureServer()
+	var service services.MetricsService
+
+	if cfg.DBDsn != "" {
+		service = configureWithDatabase(cfg)
+	} else {
+		service = configureInMemtory(cfg)
+	}
 
 	e := handlers.New(service)
 
