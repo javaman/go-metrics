@@ -66,12 +66,12 @@ func (m *memStorage) Get(metric *domain.Metric) (*domain.Metric, error) {
 	case domain.Gauge:
 		value, present := m.gauges[metric.ID]
 		if present {
-			return &domain.Metric{metric.ID, domain.Gauge, nil, &value}, nil
+			return &domain.Metric{ID: metric.ID, MType: domain.Gauge, Delta: nil, Value: &value}, nil
 		}
 	case domain.Counter:
 		delta, present := m.counters[metric.ID]
 		if present {
-			return &domain.Metric{metric.ID, domain.Counter, &delta, nil}, nil
+			return &domain.Metric{ID: metric.ID, MType: domain.Counter, Delta: &delta, Value: nil}, nil
 		}
 	default:
 		return nil, domain.ErrorInvalidType

@@ -62,7 +62,7 @@ func (h *MetricHandler) ValueCounter(c echo.Context) error {
 
 	switch err {
 	case nil:
-		return c.String(http.StatusOK, fmt.Sprintf("%s", counter))
+		return c.String(http.StatusOK, counter.String())
 	case domain.ErrorNotFound:
 		return h.NotFound(c)
 	default:
@@ -78,7 +78,7 @@ func (h *MetricHandler) ValueGauge(c echo.Context) error {
 
 	switch err {
 	case nil:
-		return c.String(http.StatusOK, fmt.Sprintf("%s", counter))
+		return c.String(http.StatusOK, counter.String())
 	case domain.ErrorNotFound:
 		return h.NotFound(c)
 	default:

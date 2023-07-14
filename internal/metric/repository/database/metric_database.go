@@ -46,19 +46,23 @@ func createTable(db *sql.DB) error {
 func mapRow(src interface{ Scan(dest ...any) error }, dst *domain.Metric) error {
 	var delta int64
 	var value float64
+
 	err := src.Scan(&dst.ID, &dst.MType, &delta, &value)
-	switch err {
-	case sql.ErrNoRows:
+
+	switch {
+	case errors.Is(err, sql.ErrNoRows):
 		return domain.ErrorNotFound
-	default:
+	case err != nil:
 		return err
 	}
+
 	switch dst.MType {
 	case domain.Gauge:
 		dst.Value = &value
 	case domain.Counter:
 		dst.Delta = &delta
 	}
+
 	return nil
 }
 
