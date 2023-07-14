@@ -45,13 +45,13 @@ func (muc *metricUsecase) SaveAll(ms []domain.Metric) error {
 }
 
 func (muc *metricUsecase) Get(m *domain.Metric) (*domain.Metric, error) {
-	return muc.metricRep.Get(m)
+	return muc.metricRepo.Get(m)
 }
 
 func (muc *metricUsecase) List() ([]*domain.Metric, error) {
-	return muc.metricRep.List()
+	return muc.metricRepo.List()
 }
 
 func (muc *metricUsecase) Ping() bool {
-	return muc.metricRep.Ping()
+	return muc.metricRepo.Ping()
 }
