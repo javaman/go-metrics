@@ -26,9 +26,9 @@ type Metric struct {
 func (m *Metric) String() string {
 	switch m.MType {
 	case Gauge:
-		return fmt.Sprintf("%d", *m.Delta)
-	case Counter:
 		return strconv.FormatFloat(*m.Value, 'f', -1, 64)
+	case Counter:
+		return fmt.Sprintf("%d", *m.Delta)
 	default:
 		return ""
 	}
