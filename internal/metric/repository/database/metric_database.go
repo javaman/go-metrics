@@ -75,7 +75,7 @@ func (d *databaseStorage) Save(metric *domain.Metric) error {
 }
 
 func (d *databaseStorage) Get(metric *domain.Metric) (*domain.Metric, error) {
-	var result *domain.Metric = &domain.Metric{}
+	result := &domain.Metric{}
 	err := retry(func() error {
 		return mapRow(d.db.QueryRow("SELECT id, mtype, delta, value FROM metrics WHERE id=$1 and mtype=$2", metric.ID, metric.MType), result)
 	})
@@ -97,7 +97,7 @@ func (d *databaseStorage) List() ([]*domain.Metric, error) {
 			_ = rows.Err()
 		}()
 		for rows.Next() {
-			var metric *domain.Metric = &domain.Metric{}
+			*domain.Metric := &domain.Metric{}
 			if err := mapRow(rows, metric); err != nil {
 				return err
 			}

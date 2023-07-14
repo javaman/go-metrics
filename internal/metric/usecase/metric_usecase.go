@@ -16,7 +16,7 @@ func (muc *metricUsecase) Save(m *domain.Metric) (*domain.Metric, error) {
 		if err := muc.metricRepo.Save(m); err != nil {
 			return nil, err
 		}
-		var value float64 = *m.Value
+		value := *m.Value
 		return &domain.Metric{ID: m.ID, MType: m.MType, Value: &value}, nil
 	case domain.Counter:
 		var result *domain.Metric
@@ -45,13 +45,13 @@ func (muc *metricUsecase) SaveAll(ms []domain.Metric) error {
 }
 
 func (muc *metricUsecase) Get(m *domain.Metric) (*domain.Metric, error) {
-	return muc.Get(m)
+	return muc.metricRep.Get(m)
 }
 
 func (muc *metricUsecase) List() ([]*domain.Metric, error) {
-	return muc.List()
+	return muc.metricRep.List()
 }
 
 func (muc *metricUsecase) Ping() bool {
-	return muc.Ping()
+	return muc.metricRep.Ping()
 }
