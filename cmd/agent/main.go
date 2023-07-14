@@ -10,7 +10,7 @@ import (
 
 	"github.com/go-resty/resty/v2"
 	"github.com/javaman/go-metrics/internal/config"
-	"github.com/javaman/go-metrics/internal/model"
+	"github.com/javaman/go-metrics/internal/domain"
 )
 
 type MeasureDestination interface {
@@ -117,7 +117,7 @@ type measuresServer struct {
 }
 
 func (s *measuresServer) saveCounter(m Measure, v int64) {
-	j := &model.Metrics{ID: m.name(), MType: "counter", Delta: &v}
+	j := &domain.Metric{ID: m.name(), MType: "counter", Delta: &v}
 	encoded, _ := json.Marshal(*j)
 	s.R().
 		SetHeader("Content-Type", "application/json").
@@ -126,7 +126,7 @@ func (s *measuresServer) saveCounter(m Measure, v int64) {
 }
 
 func (s *measuresServer) saveGauge(m Measure, v float64) {
-	j := &model.Metrics{ID: m.name(), MType: "gauge", Value: &v}
+	j := &domain.Metric{ID: m.name(), MType: "gauge", Value: &v}
 	encoded, _ := json.Marshal(j)
 	s.R().
 		SetHeader("Content-Type", "application/json").
@@ -139,15 +139,15 @@ func (s *measuresServer) finishBatch() {
 
 type batchedMeasuresServer struct {
 	*resty.Client
-	measures []model.Metrics
+	measures []domain.Metric
 }
 
 func (s *batchedMeasuresServer) saveCounter(m Measure, v int64) {
-	s.measures = append(s.measures, model.Metrics{ID: m.name(), MType: "counter", Delta: &v})
+	s.measures = append(s.measures, domain.Metric{ID: m.name(), MType: "counter", Delta: &v})
 }
 
 func (s *batchedMeasuresServer) saveGauge(m Measure, v float64) {
-	s.measures = append(s.measures, model.Metrics{ID: m.name(), MType: "gauge", Value: &v})
+	s.measures = append(s.measures, domain.Metric{ID: m.name(), MType: "gauge", Value: &v})
 }
 
 func (s *batchedMeasuresServer) finishBatch() {
@@ -221,7 +221,7 @@ func main() {
 	measuresBuffer := &measuresBuffer{}
 	measuresServer := &batchedMeasuresServer{
 		resty.New(),
-		make([]model.Metrics, 1),
+		make([]domain.Metric, 1),
 	}
 	measuresServer.SetBaseURL("http://" + conf.Address + "/updates")
 

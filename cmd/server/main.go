@@ -2,51 +2,54 @@ package main
 
 import (
 	"database/sql"
-	"database/sql/driver"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/javaman/go-metrics/internal/config"
-	"github.com/javaman/go-metrics/internal/handlers"
-	"github.com/javaman/go-metrics/internal/repository"
-	"github.com/javaman/go-metrics/internal/services"
+	"github.com/javaman/go-metrics/internal/domain"
+	"github.com/javaman/go-metrics/internal/metric/delivery/http"
+	"github.com/javaman/go-metrics/internal/metric/delivery/http/middleware"
+	"github.com/javaman/go-metrics/internal/metric/repository/database"
+	"github.com/javaman/go-metrics/internal/metric/repository/inmemory"
+	"github.com/javaman/go-metrics/internal/metric/usecase"
+	"github.com/labstack/echo/v4"
 )
 
-func configureWithDatabase(cfg *config.ServerConfiguration) (services.MetricsService, driver.Pinger) {
+func configureWithDatabase(cfg *config.ServerConfiguration) domain.MetricUsecase {
 	db, _ := sql.Open("pgx", cfg.DBDsn)
-	storage := repository.NewDatabaseStorage(db)
-	return services.NewMetricsService(storage), storage
+	r := database.New(db)
+	return usecase.New(r)
 }
 
-func configureInMemtory(cfg *config.ServerConfiguration) (services.MetricsService, driver.Pinger) {
-	var storage repository.Storage
+func configureInMemtory(cfg *config.ServerConfiguration) domain.MetricUsecase {
+	var r domain.MetricRepository
 
 	if cfg.Restore {
-		storage = repository.NewInMemoryStorageFromFile(cfg.FileStoragePath)
+		r = inmemory.NewFromFile(cfg.FileStoragePath)
 	} else {
-		storage = repository.NewInMemoryStorage()
+		r = inmemory.New()
 	}
 
 	if cfg.StoreInterval > 0 {
-		services.FlushStorageInBackground(storage, cfg.FileStoragePath, cfg.StoreInterval)
+		inmemory.FlushStorageInBackground(r, cfg.FileStoragePath, cfg.StoreInterval)
 	} else {
-		storage = repository.MakeStorageFlushedOnEachCall(storage, cfg.FileStoragePath)
+		r = inmemory.MakeFlushedOnEachSave(r, cfg.FileStoragePath)
 	}
 
-	return services.NewMetricsService(storage), storage
+	return usecase.New(r)
 }
 
 func main() {
 	cfg := config.ConfigureServer()
-	var service services.MetricsService
-	var ping driver.Pinger
+	var u domain.MetricUsecase
 
 	if cfg.DBDsn != "" {
-		service, ping = configureWithDatabase(cfg)
+		u = configureWithDatabase(cfg)
 	} else {
-		service, ping = configureInMemtory(cfg)
+		u = configureInMemtory(cfg)
 	}
 
-	e := handlers.New(service, ping)
-
+	e := echo.New()
+	e.Use(middleware.CompressDecompress)
+	http.New(e, u)
 	e.Logger.Fatal(e.Start(cfg.Address))
 }
