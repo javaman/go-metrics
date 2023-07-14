@@ -50,6 +50,7 @@ func main() {
 
 	e := echo.New()
 	e.Use(middleware.CompressDecompress)
+	e.Use(middleware.Logger())
 	http.New(e, u)
 	e.Logger.Fatal(e.Start(cfg.Address))
 }

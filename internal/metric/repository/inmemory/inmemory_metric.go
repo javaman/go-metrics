@@ -82,10 +82,12 @@ func (m *memStorage) Get(metric *domain.Metric) (*domain.Metric, error) {
 func (m *memStorage) List() ([]*domain.Metric, error) {
 	var result []*domain.Metric
 	for id, value := range m.gauges {
-		result = append(result, &domain.Metric{ID: id, MType: domain.Gauge, Value: &value})
+		x := value
+		result = append(result, &domain.Metric{ID: id, MType: domain.Gauge, Value: &x})
 	}
 	for id, delta := range m.counters {
-		result = append(result, &domain.Metric{ID: id, MType: domain.Counter, Delta: &delta})
+		x := delta
+		result = append(result, &domain.Metric{ID: id, MType: domain.Counter, Delta: &x})
 	}
 	return result, nil
 }

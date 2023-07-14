@@ -1,6 +1,8 @@
 package usecase
 
-import "github.com/javaman/go-metrics/internal/domain"
+import (
+	"github.com/javaman/go-metrics/internal/domain"
+)
 
 type metricUsecase struct {
 	metricRepo domain.MetricRepository
@@ -35,11 +37,9 @@ func (muc *metricUsecase) Save(m *domain.Metric) (*domain.Metric, error) {
 	}
 }
 
-func (muc *metricUsecase) SaveAll(ms []domain.Metric) error {
-	for _, metric := range ms {
-		if _, err := muc.Save(&metric); err != nil {
-			return err
-		}
+func (muc *metricUsecase) SaveAll(metrics []domain.Metric) error {
+	for _, metric := range metrics {
+		muc.Save(&metric)
 	}
 	return nil
 }

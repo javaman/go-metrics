@@ -112,7 +112,7 @@ func Compress(next echo.HandlerFunc) echo.HandlerFunc {
 			c.Response().Writer = cw
 		}
 		return next(c)
-		}
+	}
 }
 
 func CompressDecompress(next echo.HandlerFunc) echo.HandlerFunc {

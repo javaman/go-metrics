@@ -23,7 +23,7 @@ type Metric struct {
 	Value *float64 `json:"value,omitempty"`
 }
 
-func (m *Metric) String() string {
+func (m Metric) String() string {
 	switch m.MType {
 	case Gauge:
 		return strconv.FormatFloat(*m.Value, 'f', -1, 64)

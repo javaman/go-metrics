@@ -140,6 +140,7 @@ func (h *MetricHandler) UpdateGauge(c echo.Context) error {
 	}
 	if value, err := strconv.ParseFloat(c.Param("measureValue"), 64); err == nil {
 		gauge := &domain.Metric{ID: measureName, MType: domain.Gauge, Value: &value}
+		fmt.Println("Here")
 		h.usecase.Save(gauge)
 		return h.OK(c)
 	} else {
