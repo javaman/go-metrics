@@ -44,8 +44,8 @@ func createTable(db *sql.DB) error {
 }
 
 func mapRow(src interface{ Scan(dest ...any) error }, dst *domain.Metric) error {
-	var delta int64
-	var value float64
+	var delta sql.NullInt64
+	var value sql.NullFloat64
 
 	err := src.Scan(&dst.ID, &dst.MType, &delta, &value)
 
@@ -58,9 +58,9 @@ func mapRow(src interface{ Scan(dest ...any) error }, dst *domain.Metric) error 
 
 	switch dst.MType {
 	case domain.Gauge:
-		dst.Value = &value
+		dst.Value = &value.Float64
 	case domain.Counter:
-		dst.Delta = &delta
+		dst.Delta = &delta.Int64
 	}
 
 	return nil
