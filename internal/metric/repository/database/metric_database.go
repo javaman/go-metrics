@@ -97,7 +97,7 @@ func (d *databaseStorage) List() ([]*domain.Metric, error) {
 			_ = rows.Err()
 		}()
 		for rows.Next() {
-			*domain.Metric := &domain.Metric{}
+			metric := &domain.Metric{}
 			if err := mapRow(rows, metric); err != nil {
 				return err
 			}
