@@ -1,32 +1,59 @@
 package main
 
 import (
+	"database/sql"
+
+	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/javaman/go-metrics/internal/config"
-	"github.com/javaman/go-metrics/internal/handlers"
-	"github.com/javaman/go-metrics/internal/repository"
-	"github.com/javaman/go-metrics/internal/services"
+	"github.com/javaman/go-metrics/internal/domain"
+	"github.com/javaman/go-metrics/internal/metric/delivery/http"
+	"github.com/javaman/go-metrics/internal/metric/delivery/http/middleware"
+	"github.com/javaman/go-metrics/internal/metric/repository/database"
+	"github.com/javaman/go-metrics/internal/metric/repository/inmemory"
+	"github.com/javaman/go-metrics/internal/metric/usecase"
+	"github.com/labstack/echo/v4"
 )
 
-func main() {
-	cfg := config.ConfigureServer()
+func configureWithDatabase(cfg *config.ServerConfiguration) domain.MetricUsecase {
+	db, err := sql.Open("pgx", cfg.DBDsn)
+	if err != nil {
+		panic(err)
+	}
+	r := database.New(db)
+	return usecase.New(r)
+}
 
-	var storage repository.Storage
+func configureInMemory(cfg *config.ServerConfiguration) domain.MetricUsecase {
+	var r domain.MetricRepository
 
 	if cfg.Restore {
-		storage = repository.NewInMemoryStorageFromFile(cfg.FileStoragePath)
+		r = inmemory.NewFromFile(cfg.FileStoragePath)
 	} else {
-		storage = repository.NewInMemoryStorage()
+		r = inmemory.New()
 	}
 
 	if cfg.StoreInterval > 0 {
-		services.FlushStorageInBackground(storage, cfg.FileStoragePath, cfg.StoreInterval)
+		inmemory.FlushStorageInBackground(r, cfg.FileStoragePath, cfg.StoreInterval)
 	} else {
-		storage = repository.MakeStorageFlushedOnEachCall(storage, cfg.FileStoragePath)
+		r = inmemory.MakeFlushedOnEachSave(r, cfg.FileStoragePath)
 	}
 
-	service := services.NewMetricsService(storage)
+	return usecase.New(r)
+}
 
-	e := handlers.New(service)
+func main() {
+	cfg := config.ConfigureServer()
+	var metricUsecase domain.MetricUsecase
 
+	if cfg.DBDsn != "" {
+		metricUsecase = configureWithDatabase(cfg)
+	} else {
+		metricUsecase = configureInMemory(cfg)
+	}
+
+	e := echo.New()
+	e.Use(middleware.CompressDecompress)
+	e.Use(middleware.Logger())
+	http.New(e, metricUsecase)
 	e.Logger.Fatal(e.Start(cfg.Address))
 }
