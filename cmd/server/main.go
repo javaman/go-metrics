@@ -15,12 +15,15 @@ import (
 )
 
 func configureWithDatabase(cfg *config.ServerConfiguration) domain.MetricUsecase {
-	db, _ := sql.Open("pgx", cfg.DBDsn)
+	db, err := sql.Open("pgx", cfg.DBDsn)
+	if err != nil {
+		panic(err)
+	}
 	r := database.New(db)
 	return usecase.New(r)
 }
 
-func configureInMemtory(cfg *config.ServerConfiguration) domain.MetricUsecase {
+func configureInMemory(cfg *config.ServerConfiguration) domain.MetricUsecase {
 	var r domain.MetricRepository
 
 	if cfg.Restore {
@@ -40,17 +43,17 @@ func configureInMemtory(cfg *config.ServerConfiguration) domain.MetricUsecase {
 
 func main() {
 	cfg := config.ConfigureServer()
-	var u domain.MetricUsecase
+	var metricUsecase domain.MetricUsecase
 
 	if cfg.DBDsn != "" {
-		u = configureWithDatabase(cfg)
+		metricUsecase = configureWithDatabase(cfg)
 	} else {
-		u = configureInMemtory(cfg)
+		metricUsecase = configureInMemory(cfg)
 	}
 
 	e := echo.New()
 	e.Use(middleware.CompressDecompress)
 	e.Use(middleware.Logger())
-	http.New(e, u)
+	http.New(e, metricUsecase)
 	e.Logger.Fatal(e.Start(cfg.Address))
 }

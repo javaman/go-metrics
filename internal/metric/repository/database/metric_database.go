@@ -43,11 +43,11 @@ func createTable(db *sql.DB) error {
 	})
 }
 
-func mapRow(src interface{ Scan(dest ...any) error }, dst *domain.Metric) error {
+func mapRow(rows *sql.Rows, dst *domain.Metric) error {
 	var delta sql.NullInt64
 	var value sql.NullFloat64
 
-	err := src.Scan(&dst.ID, &dst.MType, &delta, &value)
+	err := rows.Scan(&dst.ID, &dst.MType, &delta, &value)
 
 	switch {
 	case errors.Is(err, sql.ErrNoRows):
@@ -66,6 +66,26 @@ func mapRow(src interface{ Scan(dest ...any) error }, dst *domain.Metric) error 
 	return nil
 }
 
+func (d *databaseStorage) query(sql string, args ...any) ([]*domain.Metric, error) {
+	rows, err := d.db.Query(sql, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		_ = rows.Close()
+		_ = rows.Err()
+	}()
+	var result []*domain.Metric
+	for rows.Next() {
+		metric := &domain.Metric{}
+		if err := mapRow(rows, metric); err != nil {
+			return nil, err
+		}
+		result = append(result, metric)
+	}
+	return result, nil
+}
+
 func (d *databaseStorage) Save(metric *domain.Metric) error {
 	return retry(func() error {
 		_, err := d.db.Exec(`insert into metrics(id, mtype, delta, value) values($1, $2, $3, $4) 
@@ -75,9 +95,17 @@ func (d *databaseStorage) Save(metric *domain.Metric) error {
 }
 
 func (d *databaseStorage) Get(metric *domain.Metric) (*domain.Metric, error) {
-	result := &domain.Metric{}
+	var result *domain.Metric
 	err := retry(func() error {
-		return mapRow(d.db.QueryRow("SELECT id, mtype, delta, value FROM metrics WHERE id=$1 and mtype=$2", metric.ID, metric.MType), result)
+		results, err := d.query("SELECT id, mtype, delta, value FROM metrics WHERE id=$1 and mtype=$2", metric.ID, metric.MType)
+		if err != nil {
+			return err
+		}
+		if len(results) < 1 {
+			return domain.ErrorNotFound
+		}
+		result = results[0]
+		return nil
 	})
 	if err == nil {
 		return result, nil
@@ -88,33 +116,17 @@ func (d *databaseStorage) Get(metric *domain.Metric) (*domain.Metric, error) {
 func (d *databaseStorage) List() ([]*domain.Metric, error) {
 	var result []*domain.Metric
 	err := retry(func() error {
-		rows, err := d.db.Query("SELECT id, mtype, delta, value FROM metrics")
+		rows, err := d.query("SELECT id, mtype, delta, value FROM metrics")
 		if err != nil {
 			return err
 		}
-		defer func() {
-			_ = rows.Close()
-			_ = rows.Err()
-		}()
-		for rows.Next() {
-			metric := &domain.Metric{}
-			if err := mapRow(rows, metric); err != nil {
-				return err
-			}
-			result = append(result, metric)
-		}
+		result = rows
 		return nil
-
 	})
 	if err != nil {
 		return nil, err
 	}
 	return result, nil
-}
-
-func (d *databaseStorage) WriteToFile(file string) error {
-	//Ok to do nothing
-	return nil
 }
 
 func (d *databaseStorage) Ping() bool {

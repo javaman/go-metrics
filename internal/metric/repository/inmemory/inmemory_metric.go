@@ -33,6 +33,10 @@ func New() *memStorage {
 	return &memStorage{make(map[string]int64), make(map[string]float64)}
 }
 
+type writableToFile interface {
+	WriteToFile(fname string) error
+}
+
 type memStorage struct {
 	counters map[string]int64
 	gauges   map[string]float64
@@ -104,7 +108,10 @@ type wrappingSaveToFile struct {
 func (m *wrappingSaveToFile) Save(metric *domain.Metric) error {
 	err := m.MetricRepository.Save(metric)
 	if err == nil {
-		return m.MetricRepository.WriteToFile(m.fileName)
+		if writeableToFile, ok := m.MetricRepository.(writableToFile); ok {
+			return writeableToFile.WriteToFile(m.fileName)
+		}
+		return nil
 	}
 	return err
 }
@@ -134,10 +141,13 @@ func (m *memStorage) MarshalJSON() ([]byte, error) {
 }
 
 func FlushStorageInBackground(r domain.MetricRepository, fname string, interval int) {
-	go func() {
-		for {
-			time.Sleep(time.Duration(interval) * time.Second)
-			r.WriteToFile(fname)
-		}
-	}()
+	writableToFile, ok := r.(writableToFile)
+	if ok {
+		go func() {
+			for {
+				time.Sleep(time.Duration(interval) * time.Second)
+				writableToFile.WriteToFile(fname)
+			}
+		}()
+	}
 }

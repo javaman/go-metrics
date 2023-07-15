@@ -47,5 +47,4 @@ type MetricRepository interface {
 	Get(m *Metric) (*Metric, error)
 	List() ([]*Metric, error)
 	Ping() bool
-	WriteToFile(fname string) error
 }
