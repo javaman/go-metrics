@@ -1,3 +1,13 @@
+#  Структура каталогов основана на Сlean Architecture
+
+Пример взял тут
+
+[This is an example of implementation of Clean Architecture in Go (Golang) projects.](https://github.com/bxcodec/go-clean-arch)
+
+
+
+
+
 # go-musthave-metrics-tpl
 
 Шаблон репозитория для трека «Сервер сбора метрик и алертинга».

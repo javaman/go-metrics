@@ -2,18 +2,22 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"math/rand"
+	"net"
 	"runtime"
 	"time"
 
 	"github.com/go-resty/resty/v2"
 	"github.com/javaman/go-metrics/internal/config"
-	"github.com/javaman/go-metrics/internal/model"
+	"github.com/javaman/go-metrics/internal/domain"
+	"github.com/javaman/go-metrics/internal/tools"
 )
 
 type MeasureDestination interface {
 	saveCounter(m Measure, value int64)
 	saveGauge(m Measure, value float64)
+	finishBatch()
 }
 
 type Measure interface {
@@ -61,6 +65,9 @@ func (mb *measuresBuffer) saveCounter(m Measure, value int64) {
 
 func (mb *measuresBuffer) saveGauge(m Measure, value float64) {
 	mb.buffer = append(mb.buffer, m)
+}
+
+func (mb *measuresBuffer) finishBatch() {
 }
 
 type defaultMeasured struct {
@@ -111,7 +118,7 @@ type measuresServer struct {
 }
 
 func (s *measuresServer) saveCounter(m Measure, v int64) {
-	j := &model.Metrics{ID: m.name(), MType: "counter", Delta: &v}
+	j := &domain.Metric{ID: m.name(), MType: "counter", Delta: &v}
 	encoded, _ := json.Marshal(*j)
 	s.R().
 		SetHeader("Content-Type", "application/json").
@@ -120,12 +127,52 @@ func (s *measuresServer) saveCounter(m Measure, v int64) {
 }
 
 func (s *measuresServer) saveGauge(m Measure, v float64) {
-	j := &model.Metrics{ID: m.name(), MType: "gauge", Value: &v}
+	j := &domain.Metric{ID: m.name(), MType: "gauge", Value: &v}
 	encoded, _ := json.Marshal(j)
 	s.R().
 		SetHeader("Content-Type", "application/json").
 		SetBody(string(encoded[:])).
 		Post("/")
+}
+
+func (s *measuresServer) finishBatch() {
+}
+
+type batchedMeasuresServer struct {
+	*resty.Client
+	measures []domain.Metric
+	key      string
+}
+
+func (s *batchedMeasuresServer) saveCounter(m Measure, v int64) {
+	s.measures = append(s.measures, domain.Metric{ID: m.name(), MType: "counter", Delta: &v})
+}
+
+func (s *batchedMeasuresServer) saveGauge(m Measure, v float64) {
+	s.measures = append(s.measures, domain.Metric{ID: m.name(), MType: "gauge", Value: &v})
+}
+
+func (s *batchedMeasuresServer) finishBatch() {
+	delays := [...]int{1, 3, 5}
+	encoded, _ := json.Marshal(s.measures)
+	for _, delay := range delays {
+		request := s.R()
+		if len(s.key) > 0 {
+			request.SetHeader("HashSHA256", tools.ComputeSign(encoded, s.key))
+		}
+		_, err := request.
+			SetHeader("Content-Type", "application/json").
+			SetBody(string(encoded[:])).
+			Post("/")
+		if err == nil {
+			break
+		}
+		var opError *net.OpError
+		if !errors.As(err, &opError) {
+			break
+		}
+		time.Sleep(time.Duration(delay) * time.Second)
+	}
 }
 
 func gcd(a, b int) int {
@@ -140,6 +187,7 @@ func send(measures []Measure, destination MeasureDestination) {
 	for _, m := range measures {
 		m.save(destination)
 	}
+	destination.finishBatch()
 }
 
 type Worker interface {
@@ -177,10 +225,12 @@ func main() {
 
 	defaultMeasured := &defaultMeasured{}
 	measuresBuffer := &measuresBuffer{}
-	measuresServer := &measuresServer{
+	measuresServer := &batchedMeasuresServer{
 		resty.New(),
+		make([]domain.Metric, 1),
+		conf.Key,
 	}
-	measuresServer.SetBaseURL("http://" + conf.Address + "/update")
+	measuresServer.SetBaseURL("http://" + conf.Address + "/updates")
 
 	dw := &defaultWorker{
 		conf.PollInterval,
