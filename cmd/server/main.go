@@ -19,8 +19,8 @@ func configureWithDatabase(cfg *config.ServerConfiguration) domain.MetricUsecase
 	if err != nil {
 		panic(err)
 	}
-	r := database.New(db)
-	return usecase.New(r)
+	repository := database.New(db)
+	return usecase.New(repository)
 }
 
 func configureInMemory(cfg *config.ServerConfiguration) domain.MetricUsecase {
@@ -54,6 +54,10 @@ func main() {
 	e := echo.New()
 	e.Use(middleware.CompressDecompress)
 	e.Use(middleware.Logger())
+	if len(cfg.Key) > 0 {
+		e.Use(middleware.VerifyHash(cfg.Key))
+		e.Use(middleware.AppendHash(cfg.Key))
+	}
 	http.New(e, metricUsecase)
 	e.Logger.Fatal(e.Start(cfg.Address))
 }

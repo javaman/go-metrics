@@ -11,6 +11,7 @@ import (
 	"github.com/go-resty/resty/v2"
 	"github.com/javaman/go-metrics/internal/config"
 	"github.com/javaman/go-metrics/internal/domain"
+	"github.com/javaman/go-metrics/internal/tools"
 )
 
 type MeasureDestination interface {
@@ -140,6 +141,7 @@ func (s *measuresServer) finishBatch() {
 type batchedMeasuresServer struct {
 	*resty.Client
 	measures []domain.Metric
+	key      string
 }
 
 func (s *batchedMeasuresServer) saveCounter(m Measure, v int64) {
@@ -154,7 +156,11 @@ func (s *batchedMeasuresServer) finishBatch() {
 	delays := [...]int{1, 3, 5}
 	encoded, _ := json.Marshal(s.measures)
 	for _, delay := range delays {
-		_, err := s.R().
+		request := s.R()
+		if len(s.key) > 0 {
+			request.SetHeader("HashSHA256", tools.ComputeSign(encoded, s.key))
+		}
+		_, err := request.
 			SetHeader("Content-Type", "application/json").
 			SetBody(string(encoded[:])).
 			Post("/")
@@ -222,6 +228,7 @@ func main() {
 	measuresServer := &batchedMeasuresServer{
 		resty.New(),
 		make([]domain.Metric, 1),
+		conf.Key,
 	}
 	measuresServer.SetBaseURL("http://" + conf.Address + "/updates")
 
