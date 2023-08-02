@@ -20,6 +20,7 @@ type AgentConfiguration struct {
 	ReportInterval int    `env:"REPORT_INTERVAL"`
 	PollInterval   int    `env:"POLL_INTERVAL"`
 	Key            string `env:"KEY"`
+	RateLimit      int    `env:"RATE_LIMIT"`
 }
 
 func ConfigureServer() *ServerConfiguration {
@@ -45,6 +46,7 @@ func ConfigureAgent() *AgentConfiguration {
 	flag.IntVar(&conf.ReportInterval, "r", 10, "Частота отправки на сервер")
 	flag.IntVar(&conf.PollInterval, "p", 2, "Частота опроса метрик")
 	flag.StringVar(&conf.Key, "k", "", "Ключ")
+	flag.IntVar(&conf.RateLimit, "l", 1, "Ограничение на количество одновременных запросов к серверу")
 	flag.Parse()
 
 	env.Parse(conf)

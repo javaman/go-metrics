@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"math/rand"
@@ -12,6 +13,8 @@ import (
 	"github.com/javaman/go-metrics/internal/config"
 	"github.com/javaman/go-metrics/internal/domain"
 	"github.com/javaman/go-metrics/internal/tools"
+	"github.com/shirou/gopsutil/v3/cpu"
+	"github.com/shirou/gopsutil/v3/mem"
 )
 
 type MeasureDestination interface {
@@ -111,31 +114,12 @@ func (d *defaultMeasured) captureMetrics(destination MeasureDestination) {
 
 	GaugeMeasure{rand.Float64(), "RandomValue"}.save(destination)
 
-}
+	v, _ := mem.VirtualMemory()
+	GaugeMeasure{float64(v.Total), "TotalMemory"}.save(destination)
+	GaugeMeasure{float64(v.Free), "FreeMemory"}.save(destination)
 
-type measuresServer struct {
-	*resty.Client
-}
-
-func (s *measuresServer) saveCounter(m Measure, v int64) {
-	j := &domain.Metric{ID: m.name(), MType: "counter", Delta: &v}
-	encoded, _ := json.Marshal(*j)
-	s.R().
-		SetHeader("Content-Type", "application/json").
-		SetBody(string(encoded[:])).
-		Post("/")
-}
-
-func (s *measuresServer) saveGauge(m Measure, v float64) {
-	j := &domain.Metric{ID: m.name(), MType: "gauge", Value: &v}
-	encoded, _ := json.Marshal(j)
-	s.R().
-		SetHeader("Content-Type", "application/json").
-		SetBody(string(encoded[:])).
-		Post("/")
-}
-
-func (s *measuresServer) finishBatch() {
+	m, _ := cpu.Percent(0, false)
+	GaugeMeasure{m[0], "CPUutilization1"}.save(destination)
 }
 
 type batchedMeasuresServer struct {
@@ -175,48 +159,12 @@ func (s *batchedMeasuresServer) finishBatch() {
 	}
 }
 
-func gcd(a, b int) int {
-	for b != 0 {
-		a, b = b, a%b
-	}
-
-	return a
-}
-
-func send(measures []Measure, destination MeasureDestination) {
-	for _, m := range measures {
-		m.save(destination)
-	}
-	destination.finishBatch()
-}
-
-type Worker interface {
-	run()
-}
-
-type defaultWorker struct {
-	pollInterval   int
-	reportInterval int
-	pollFunction   func()
-	reportFunction func()
-	advance        func() bool
-}
-
-func (w *defaultWorker) run() {
-	intervalsGcd := gcd(w.pollInterval, w.reportInterval)
-	var timeSpent int
-	for w.advance() {
-		time.Sleep(time.Duration(intervalsGcd) * time.Second)
-		timeSpent += intervalsGcd
-		if timeSpent%w.pollInterval == 0 {
-			w.pollFunction()
+func worker(jobs <-chan []Measure, destination MeasureDestination) {
+	for measures := range jobs {
+		for _, measure := range measures {
+			measure.save(destination)
 		}
-		if timeSpent%w.reportInterval == 0 {
-			w.reportFunction()
-		}
-		if timeSpent%w.reportInterval == 0 && timeSpent%w.pollInterval == 0 {
-			timeSpent = 0
-		}
+		destination.finishBatch()
 	}
 }
 
@@ -232,22 +180,32 @@ func main() {
 	}
 	measuresServer.SetBaseURL("http://" + conf.Address + "/updates")
 
-	dw := &defaultWorker{
-		conf.PollInterval,
-		conf.ReportInterval,
-		func() { defaultMeasured.captureMetrics(measuresBuffer) },
-		func() {
-			metricsToSend := make([]Measure, len(measuresBuffer.buffer))
-			copy(metricsToSend, measuresBuffer.buffer)
+	jobs := make(chan []Measure, conf.RateLimit)
 
-			send(metricsToSend, measuresServer)
-			measuresBuffer.buffer = measuresBuffer.buffer[:0]
-		},
-		func() bool {
-			return true
-		},
+	defer func() {
+		close(jobs)
+	}()
+
+	for i := 0; i < conf.RateLimit; i++ {
+		go worker(jobs, measuresServer)
 	}
 
-	dw.run()
+	go func() {
+		for {
+			time.Sleep(time.Duration(conf.PollInterval) * time.Second)
+			defaultMeasured.captureMetrics(measuresBuffer)
+		}
+	}()
 
+	go func() {
+		for {
+			time.Sleep(time.Duration(conf.ReportInterval) * time.Second)
+			metricsToSend := make([]Measure, len(measuresBuffer.buffer))
+			copy(metricsToSend, measuresBuffer.buffer)
+			jobs <- metricsToSend
+		}
+	}()
+
+	ctx := context.Background()
+	<-ctx.Done()
 }
