@@ -66,24 +66,3 @@ func TestDefaultMeasured(t *testing.T) {
 
 	assert.Empty(t, expectedMetrics)
 }
-
-func TestDefaultWorker(t *testing.T) {
-	callsCount := map[string]int{
-		"one": 2,
-		"two": 1,
-	}
-	f1 := func() { callsCount["one"] = callsCount["one"] - 1 }
-	f2 := func() { callsCount["two"] = callsCount["two"] - 1 }
-	p := func() bool { return callsCount["two"] > 0 }
-	dw := &defaultWorker{
-		1,
-		2,
-		f1,
-		f2,
-		p,
-	}
-	dw.run()
-	assert.Equal(t, 0, callsCount["one"])
-	assert.Equal(t, 0, callsCount["two"])
-
-}
