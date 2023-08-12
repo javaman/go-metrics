@@ -61,18 +61,16 @@ func Decompress(next echo.HandlerFunc) echo.HandlerFunc {
 }
 
 type bufferedWriter struct {
-	w         http.ResponseWriter
-	buffer    []byte
-	wroteBody bool
-	key       string
+	w      http.ResponseWriter
+	buffer []byte
+	status *int
 }
 
-func newBufferedWriter(w http.ResponseWriter, key string) *bufferedWriter {
+func newBufferedWriter(w http.ResponseWriter) *bufferedWriter {
 	return &bufferedWriter{
-		w:         w,
-		buffer:    nil,
-		wroteBody: false,
-		key:       key,
+		w:      w,
+		buffer: nil,
+		status: nil,
 	}
 }
 
@@ -81,18 +79,15 @@ func (b *bufferedWriter) Header() http.Header {
 }
 
 func (b *bufferedWriter) Write(p []byte) (int, error) {
-	b.wroteBody = true
 	b.buffer = append(b.buffer, p...)
-	return b.w.Write(p)
+	return len(p), nil
 }
 
 func (b *bufferedWriter) WriteHeader(statusCode int) {
-	b.w.Header().Add("HashSHA256", tools.ComputeSign(b.buffer, b.key))
-	b.w.WriteHeader(statusCode)
-}
-
-func (b *bufferedWriter) Close() error {
-	return nil
+	//fmt.Println(b.buffer)
+	//fmt.Println("Header is written")
+	//b.w.WriteHeader(statusCode)
+	b.status = &statusCode
 }
 
 type compressWriter struct {
@@ -178,13 +173,14 @@ func AppendHash(key string) func(next echo.HandlerFunc) echo.HandlerFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
 			rw := c.Response().Writer
-			cw := newBufferedWriter(rw, key)
-			defer func() {
-				if !cw.wroteBody {
-					c.Response().Writer = rw
-				}
-			}()
+			cw := newBufferedWriter(rw)
 			c.Response().Writer = cw
+			defer func() {
+				rw.Header().Set("HashSHA256", tools.ComputeSign(cw.buffer, key))
+				rw.WriteHeader(*cw.status)
+				rw.Write(cw.buffer)
+				c.Response().Writer = rw
+			}()
 			return next(c)
 		}
 	}

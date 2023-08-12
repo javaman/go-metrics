@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"math/rand"
 	"net"
 	"runtime"
@@ -118,8 +119,12 @@ func (d *defaultMeasured) captureMetrics(destination MeasureDestination) {
 	GaugeMeasure{float64(v.Total), "TotalMemory"}.save(destination)
 	GaugeMeasure{float64(v.Free), "FreeMemory"}.save(destination)
 
-	m, _ := cpu.Percent(0, false)
-	GaugeMeasure{m[0], "CPUutilization1"}.save(destination)
+	m, _ := cpu.Percent(0, true)
+
+	for i, cpuUtilization := range m {
+		GaugeMeasure{cpuUtilization, fmt.Sprintf("CPUutilization%d", i)}.save(destination)
+
+	}
 }
 
 type batchedMeasuresServer struct {

@@ -53,11 +53,11 @@ func main() {
 
 	e := echo.New()
 	e.Use(middleware.CompressDecompress)
-	e.Use(middleware.Logger())
 	if len(cfg.Key) > 0 {
 		e.Use(middleware.VerifyHash(cfg.Key))
 		e.Use(middleware.AppendHash(cfg.Key))
 	}
+	e.Use(middleware.Logger())
 	http.New(e, metricUsecase)
 	e.Logger.Fatal(e.Start(cfg.Address))
 }
