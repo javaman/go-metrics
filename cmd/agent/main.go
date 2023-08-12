@@ -122,8 +122,7 @@ func (d *defaultMeasured) captureMetrics(destination MeasureDestination) {
 	m, _ := cpu.Percent(0, true)
 
 	for i, cpuUtilization := range m {
-		GaugeMeasure{cpuUtilization, fmt.Sprintf("CPUutilization%d", i)}.save(destination)
-
+		GaugeMeasure{cpuUtilization, fmt.Sprintf("CPUUtilization%d", i)}.save(destination)
 	}
 }
 
